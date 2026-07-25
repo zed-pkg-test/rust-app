@@ -1,5 +1,5 @@
 [package]
-org = "zedtest"
+org = "zed-pkg-test"
 name = "rust-app"
 version = "0.1.0"
 description = "A Rust app sourcing one crate via zed and the rest via cargo."
@@ -13,4 +13,4 @@ url = "https://github.com/zed-pkg-test/rust-app"
 dir = ".vendor/.zed"
 
 [dependencies]
-"zedtest/rust-lib" = "^1.0.0"
+"zed-pkg-test/rust-lib" = "^1.0.0"

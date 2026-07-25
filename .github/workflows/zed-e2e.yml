@@ -1,4 +1,4 @@
-name: zed e2e (rust)
+name: zed e2e (rust + docker)
 on:
   push:
   workflow_dispatch:
@@ -7,27 +7,89 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Shared zed env
+
+      - name: Prepare the Docker build context
         run: |
-          echo "ZED_PKG_HOME=$RUNNER_TEMP/zed-home"        >> "$GITHUB_ENV"
-          echo "ZED_PKG_REGISTRY=file://$RUNNER_TEMP/zed-reg" >> "$GITHUB_ENV"
-      - name: Build the zed CLI (zed-cli + zed-interfaces siblings)
+          mkdir -p "$RUNNER_TEMP/zed-docker-context"
+          git clone --depth 1 \
+            https://github.com/zed-pkg/zed-interfaces \
+            "$RUNNER_TEMP/zed-docker-context/zed-interfaces"
+          git clone --depth 1 \
+            https://github.com/zed-pkg/zed-cli \
+            "$RUNNER_TEMP/zed-docker-context/zed-cli"
+
+      - name: Build Rust + zed test image
         run: |
-          cd "$RUNNER_TEMP"
-          git clone --depth 1 https://github.com/zed-pkg/zed-interfaces
-          git clone --depth 1 https://github.com/zed-pkg/zed-cli
-          (cd zed-cli && cargo build --release --bin zed --locked)
-          echo "$RUNNER_TEMP/zed-cli/target/release" >> "$GITHUB_PATH"
-      - name: Publish the zed dependency (rust-lib) to the file:// registry
+          docker build \
+            --file .github/docker/Dockerfile \
+            --tag zed-pkg-test/rust-e2e \
+            "$RUNNER_TEMP/zed-docker-context"
+
+      - name: Publish rust-lib inside Docker
         run: |
-          cd "$RUNNER_TEMP"
-          git clone --depth 1 https://github.com/zed-pkg-test/rust-lib
-          mkdir -p "$RUNNER_TEMP/zed-reg"
-          (cd rust-lib && zed publish --skip-vcs-checks)
-      - name: zed sources rust-lib into .vendor/.zed
+          git clone --depth 1 \
+            https://github.com/zed-pkg-test/rust-lib \
+            "$RUNNER_TEMP/rust-lib"
+          mkdir -p "$RUNNER_TEMP/zed-registry" "$RUNNER_TEMP/zed-home"
+          docker run --rm \
+            --volume "$RUNNER_TEMP/rust-lib:/package" \
+            --volume "$RUNNER_TEMP/zed-registry:/registry" \
+            --workdir /package \
+            zed-pkg-test/rust-e2e \
+            zed publish --registry file:///registry --skip-vcs-checks
+
+      - name: Symlink install works with its store mounted
         run: |
-          zed install
-          test -e .vendor/.zed/zedtest/rust-lib/Cargo.toml || { echo "crate not installed"; exit 1; }
-      - name: cargo run (resolves the zed crate via the path dep)
-        run: cargo run --quiet
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/work" \
+            --volume "$RUNNER_TEMP/zed-registry:/registry:ro" \
+            --volume "$RUNNER_TEMP/zed-home:/zed-home" \
+            --workdir /work \
+            zed-pkg-test/rust-e2e \
+            sh -euc '
+              zed install \
+                --registry file:///registry \
+                --home /zed-home \
+                --install-mode symlink
+              test -L .vendor/.zed/zed-pkg-test/rust-lib
+              CARGO_TARGET_DIR=/tmp/target cargo run --quiet
+            '
+
+      - name: Symlink install fails without its store mount
+        run: |
+          if docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/work:ro" \
+            --workdir /work \
+            rust:bookworm \
+            sh -euc 'CARGO_TARGET_DIR=/tmp/target cargo run --quiet'
+          then
+            echo "expected the unmounted store-backed symlink to fail"
+            exit 1
+          fi
+
+      - name: Frozen copy install contains no store symlinks
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/work" \
+            --volume "$RUNNER_TEMP/zed-registry:/registry:ro" \
+            --volume "$RUNNER_TEMP/zed-home:/zed-home" \
+            --workdir /work \
+            zed-pkg-test/rust-e2e \
+            sh -euc '
+              zed install \
+                --frozen \
+                --registry file:///registry \
+                --home /zed-home \
+                --install-mode copy
+              test ! -L .vendor/.zed/zed-pkg-test/rust-lib
+              test -z "$(find .vendor/.zed -type l -print -quit)"
+              CARGO_TARGET_DIR=/tmp/target cargo run --quiet
+            '
+
+      - name: Copy install runs in a fresh Rust container
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/work:ro" \
+            --workdir /work \
+            rust:bookworm \
+            sh -euc 'CARGO_TARGET_DIR=/tmp/target cargo run --quiet'
