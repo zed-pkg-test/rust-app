@@ -1,0 +1,33 @@
+name: zed e2e (rust)
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Shared zed env
+        run: |
+          echo "ZED_PKG_HOME=$RUNNER_TEMP/zed-home"        >> "$GITHUB_ENV"
+          echo "ZED_PKG_REGISTRY=file://$RUNNER_TEMP/zed-reg" >> "$GITHUB_ENV"
+      - name: Build the zed CLI (zed-cli + zed-interfaces siblings)
+        run: |
+          cd "$RUNNER_TEMP"
+          git clone --depth 1 https://github.com/zed-pkg/zed-interfaces
+          git clone --depth 1 https://github.com/zed-pkg/zed-cli
+          (cd zed-cli && cargo build --release --bin zed --locked)
+          echo "$RUNNER_TEMP/zed-cli/target/release" >> "$GITHUB_PATH"
+      - name: Publish the zed dependency (rust-lib) to the file:// registry
+        run: |
+          cd "$RUNNER_TEMP"
+          git clone --depth 1 https://github.com/zed-pkg-test/rust-lib
+          mkdir -p "$RUNNER_TEMP/zed-reg"
+          (cd rust-lib && zed publish --skip-vcs-checks)
+      - name: zed sources rust-lib into .vendor/.zed
+        run: |
+          zed install
+          test -e .vendor/.zed/zedtest/rust-lib/Cargo.toml || { echo "crate not installed"; exit 1; }
+      - name: cargo run (resolves the zed crate via the path dep)
+        run: cargo run --quiet
