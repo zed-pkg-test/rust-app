@@ -62,22 +62,35 @@ docker build \
 
 clone_at https://github.com/zed-pkg-test/rust-lib.git \
   "$RUST_LIB_REF" "$RUST_LIB"
+test -z "$(git -C "$RUST_LIB" status --porcelain)"
 
 docker run --rm \
-  --volume "$RUST_LIB:/package:ro" \
-  --workdir /package \
+  --volume "$RUST_LIB:/source:ro" \
+  --workdir /tmp \
   rust:bookworm \
   sh -euc '
+    cp -a /source /tmp/package
+    chmod -R u+w /tmp/package
+    cd /tmp/package
     CARGO_TARGET_DIR=/tmp/target cargo test --quiet
     grep -Fq "zed-pkg-test/rust-lib" src/lib.rs
   '
+test -z "$(git -C "$RUST_LIB" status --porcelain)"
+test "$(git -C "$RUST_LIB" rev-parse HEAD)" = "$RUST_LIB_REF"
 
 docker run --rm \
-  --volume "$RUST_LIB:/package:ro" \
+  --volume "$RUST_LIB:/source:ro" \
   --volume "$REGISTRY:/registry" \
-  --workdir /package \
+  --workdir /tmp \
   "$IMAGE" \
-  zed publish --registry file:///registry --skip-vcs-checks
+  sh -euc '
+    cp -a /source /tmp/package
+    chmod -R u+w /tmp/package
+    cd /tmp/package
+    zed publish --registry file:///registry --skip-vcs-checks
+  '
+test -z "$(git -C "$RUST_LIB" status --porcelain)"
+test "$(git -C "$RUST_LIB" rev-parse HEAD)" = "$RUST_LIB_REF"
 if ! find "$REGISTRY" -type f -print -quit | grep -q .; then
   echo "zed publish produced no registry artifact" >&2
   exit 1
