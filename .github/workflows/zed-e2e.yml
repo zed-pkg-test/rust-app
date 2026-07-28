@@ -1,95 +1,51 @@
 name: zed e2e (rust + docker)
+
 on:
+  pull_request:
   push:
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ZED_INTERFACES_REF: 61f654d5e4ca718abc4a280a641472466689c278
+  ZED_CLI_REF: 359ea72e21027ed54a29fad95b05f38a1ea142c3
+  RUST_LIB_REF: f2534ffafbc4f7e900075dfc8e48b9259aced2fe
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
-      - name: Prepare the Docker build context
-        run: |
-          mkdir -p "$RUNNER_TEMP/zed-docker-context"
-          git clone --depth 1 \
-            https://github.com/zed-pkg/zed-interfaces \
-            "$RUNNER_TEMP/zed-docker-context/zed-interfaces"
-          git clone --depth 1 \
-            https://github.com/zed-pkg/zed-cli \
-            "$RUNNER_TEMP/zed-docker-context/zed-cli"
+      - name: Validate workflow
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: .github/workflows/zed-e2e.yml
 
-      - name: Build Rust + zed test image
-        run: |
-          docker build \
-            --file .github/docker/Dockerfile \
-            --tag zed-pkg-test/rust-e2e \
-            "$RUNNER_TEMP/zed-docker-context"
+      - name: Validate executable test script
+        run: bash -n scripts/zed-e2e.sh
 
-      - name: Publish rust-lib inside Docker
+      - name: Run pinned cross-container interoperability suite
+        shell: bash
         run: |
-          git clone --depth 1 \
-            https://github.com/zed-pkg-test/rust-lib \
-            "$RUNNER_TEMP/rust-lib"
-          mkdir -p "$RUNNER_TEMP/zed-registry" "$RUNNER_TEMP/zed-home"
-          docker run --rm \
-            --volume "$RUNNER_TEMP/rust-lib:/package" \
-            --volume "$RUNNER_TEMP/zed-registry:/registry" \
-            --workdir /package \
-            zed-pkg-test/rust-e2e \
-            zed publish --registry file:///registry --skip-vcs-checks
+          set -o pipefail
+          bash scripts/zed-e2e.sh 2>&1 | tee "$RUNNER_TEMP/zed-rust-e2e.log"
 
-      - name: Symlink install works with its store mounted
-        run: |
-          docker run --rm \
-            --volume "$GITHUB_WORKSPACE:/work" \
-            --volume "$RUNNER_TEMP/zed-registry:/registry:ro" \
-            --volume "$RUNNER_TEMP/zed-home:/zed-home" \
-            --workdir /work \
-            zed-pkg-test/rust-e2e \
-            sh -euc '
-              zed install \
-                --registry file:///registry \
-                --home /zed-home \
-                --install-mode symlink
-              test -L .vendor/.zed/zed-pkg-test/rust-lib
-              CARGO_TARGET_DIR=/tmp/target cargo run --quiet
-            '
-
-      - name: Symlink install fails without its store mount
-        run: |
-          if docker run --rm \
-            --volume "$GITHUB_WORKSPACE:/work:ro" \
-            --workdir /work \
-            rust:bookworm \
-            sh -euc 'CARGO_TARGET_DIR=/tmp/target cargo run --quiet'
-          then
-            echo "expected the unmounted store-backed symlink to fail"
-            exit 1
-          fi
-
-      - name: Frozen copy install contains no store symlinks
-        run: |
-          docker run --rm \
-            --volume "$GITHUB_WORKSPACE:/work" \
-            --volume "$RUNNER_TEMP/zed-registry:/registry:ro" \
-            --volume "$RUNNER_TEMP/zed-home:/zed-home" \
-            --workdir /work \
-            zed-pkg-test/rust-e2e \
-            sh -euc '
-              zed install \
-                --frozen \
-                --registry file:///registry \
-                --home /zed-home \
-                --install-mode copy
-              test ! -L .vendor/.zed/zed-pkg-test/rust-lib
-              test -z "$(find .vendor/.zed -type l -print -quit)"
-              CARGO_TARGET_DIR=/tmp/target cargo run --quiet
-            '
-
-      - name: Copy install runs in a fresh Rust container
-        run: |
-          docker run --rm \
-            --volume "$GITHUB_WORKSPACE:/work:ro" \
-            --workdir /work \
-            rust:bookworm \
-            sh -euc 'CARGO_TARGET_DIR=/tmp/target cargo run --quiet'
+      - name: Upload interoperability diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: zed-rust-e2e-log
+          path: ${{ runner.temp }}/zed-rust-e2e.log
+          if-no-files-found: warn
+          retention-days: 7

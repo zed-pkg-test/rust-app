@@ -2,6 +2,9 @@
 name = "rust-app"
 version = "0.1.0"
 edition = "2021"
+description = "A Rust app sourcing one crate via zed and the rest via cargo."
+license = "MIT"
+publish = false
 
 # The ONE dependency sourced via zed: a cargo path dep pointing into the
 # [install].dir that `zed install` populates. crates.io deps would go here too.
