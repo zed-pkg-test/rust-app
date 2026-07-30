@@ -30,7 +30,11 @@ clone_at() {
 
 cd "$WORKSPACE"
 
-python3 - <<'PY'
+docker run --rm -i \
+  --volume "$WORKSPACE:/work:ro" \
+  --workdir /work \
+  python:3.12-bookworm \
+  python3 - <<'PY'
 import tomllib
 from pathlib import Path
 
