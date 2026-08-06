@@ -3,3 +3,7 @@ target/
 .zed/
 .zpkg.lock
 Cargo.lock
+tmp
+temp
+tmp/worktrees
+temp/worktrees
