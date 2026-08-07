@@ -5,8 +5,7 @@ fn main() {
     // independent from the target dependency's `uppercase` feature.
     let greeting = rust_lib::greet("build-script");
     assert_eq!(
-        greeting,
-        "hello build-script from zed-pkg-test/rust-lib",
+        greeting, "hello build-script from zed-pkg-test/rust-lib",
         "build dependency unexpectedly inherited target-only Cargo features"
     );
     println!("cargo:rustc-env=ZED_BUILD_GREETING={greeting}");
