@@ -1,16 +1,25 @@
 [package]
 org = "zed-pkg-test"
 name = "rust-app"
-version = "0.1.0"
-description = "A Rust app sourcing one crate via zed and the rest via cargo."
+version = "0.2.0"
+description = "A Rust app combining Zed path packages with Cargo registry dependencies."
 license = "MIT"
+
 [package.repository]
 vcs = "git"
 url = "https://github.com/zed-pkg-test/rust-app"
 
-# zed drops the crate here; cargo picks it up via the path dependency below.
+# Zed owns acquisition and placement. Cargo owns crates.io resolution, feature
+# selection, build dependencies, target compilation, and Cargo.lock.
 [install]
 dir = ".vendor/.zed"
 
 [dependencies]
-"zed-pkg-test/rust-lib" = "^1.0.0"
+"zed-pkg-test/rust-lib" = "^1.0.1"
+
+[publish]
+exclude = ["target/**", ".vendor/**", ".zed/**"]
+
+[scripts]
+test = "cargo test --locked --all-targets"
+check = "cargo check --locked --all-targets"
