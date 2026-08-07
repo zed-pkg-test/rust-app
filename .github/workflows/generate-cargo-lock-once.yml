@@ -35,7 +35,7 @@ jobs:
       - name: Materialize exact Zed package source
         shell: bash
         env:
-          RUST_LIB_REF: 93bfe97f99dc5a6903d3c7142874e1616457b383
+          RUST_LIB_REF: f3c4e33cd0e5726b2c668c0306936f01674261fa
         run: |
           set -euo pipefail
           target=.vendor/.zed/zed-pkg-test/rust-lib
