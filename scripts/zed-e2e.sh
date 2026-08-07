@@ -102,7 +102,7 @@ docker run --rm \
   --volume "$RUST_LIB:/source:ro" \
   --volume "$CARGO_HOME_DIR:/cargo-home" \
   --workdir /tmp \
-  rust:bookworm \
+  rust:1.97-bookworm \
   sh -euc '
     cp -a /source /tmp/package
     chmod -R u+w /tmp/package
@@ -182,8 +182,10 @@ assert packages["unicode-ident"]["source"].startswith("registry+")
 
 resolve = metadata["resolve"]
 root = next(node for node in resolve["nodes"] if node["id"] == resolve["root"])
+# Cargo metadata uses crate aliases in resolve.nodes[].deps[].name, not package
+# spellings. Hyphenated package names therefore appear with underscores here.
 dep_names = {dependency["name"] for dependency in root["deps"]}
-assert dep_names == {"rust-lib", "unicode_ident"}
+assert dep_names == {"rust_lib", "unicode_ident"}
 PY
 assert_lock_unchanged "$CARGO_LOCK_HASH"
 test "$(sha256sum .zpkg.lock | cut -d ' ' -f1)" = "$ZPKG_LOCK_HASH"
@@ -193,7 +195,7 @@ if docker run --rm --network none \
   --volume "$WORKSPACE:/work:ro" \
   --volume "$CARGO_HOME_DIR:/cargo-home" \
   --workdir /work \
-  rust:bookworm \
+  rust:1.97-bookworm \
   sh -euc 'CARGO_HOME=/cargo-home CARGO_TARGET_DIR=/tmp/target cargo run --locked --offline --quiet'
 then
   echo "expected the unmounted store-backed symlink to fail" >&2
@@ -231,7 +233,7 @@ docker run --rm --network none \
   --volume "$WORKSPACE:/work:ro" \
   --volume "$CARGO_HOME_DIR:/cargo-home" \
   --workdir /work \
-  rust:bookworm \
+  rust:1.97-bookworm \
   sh -euc '
     CARGO_HOME=/cargo-home CARGO_TARGET_DIR=/tmp/target cargo run --locked --offline --quiet
     CARGO_HOME=/cargo-home CARGO_TARGET_DIR=/tmp/target cargo test --locked --offline --all-targets --quiet
@@ -251,7 +253,7 @@ if docker run --rm --network none \
   --volume "$DRIFT:/work" \
   --volume "$CARGO_HOME_DIR:/cargo-home" \
   --workdir /work \
-  rust:bookworm \
+  rust:1.97-bookworm \
   sh -euc 'CARGO_HOME=/cargo-home CARGO_TARGET_DIR=/tmp/target cargo check --locked --offline'
 then
   echo "expected Cargo.lock drift to fail under --locked" >&2
