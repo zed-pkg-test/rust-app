@@ -1,8 +1,7 @@
 fn main() {
     let runtime_greeting = rust_lib::greet("rust-app");
     assert_eq!(
-        runtime_greeting,
-        "HELLO RUST-APP FROM ZED-PKG-TEST/RUST-LIB",
+        runtime_greeting, "HELLO RUST-APP FROM ZED-PKG-TEST/RUST-LIB",
         "target dependency did not receive the requested Cargo feature"
     );
     assert_eq!(
