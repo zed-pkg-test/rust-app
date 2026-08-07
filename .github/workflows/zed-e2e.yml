@@ -67,6 +67,11 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install pinned Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
         with:
@@ -95,6 +100,7 @@ jobs:
           cargo test --locked --all-targets
           cargo run --locked --quiet
           cargo metadata --locked --format-version 1 > cargo-metadata.json
+          cargo tree --locked -e features > cargo-features.txt
           cargo run --locked --offline --quiet
           cargo test --locked --offline --all-targets
           test "$(git hash-object Cargo.lock)" = "$cargo_lock_hash"
@@ -119,22 +125,25 @@ jobs:
           assert packages["unicode-ident"]["source"].startswith("registry+")
           PY
 
-      - name: Verify source and lock cleanliness
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf .vendor target cargo-metadata.json .zed .zpkg.lock
-          git diff --exit-code -- Cargo.toml Cargo.lock .zpkg.toml build.rs src tests
-          test -z "$(git status --porcelain --untracked-files=all)"
-
       - name: Upload Cargo provenance
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cargo-provenance-${{ matrix.os }}
-          path: cargo-metadata.json
+          path: |
+            cargo-metadata.json
+            cargo-features.txt
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Verify source and lock cleanliness
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .vendor target cargo-metadata.json cargo-features.txt .zed .zpkg.lock
+          git diff --exit-code -- Cargo.toml Cargo.lock .zpkg.toml build.rs src tests
+          test -z "$(git status --porcelain --untracked-files=all)"
 
   zed-registry-e2e:
     needs: workflow-contract
