@@ -14,6 +14,8 @@ ZED_HOME="$TMP/zed-home"
 CARGO_HOME_DIR="$TMP/cargo-home"
 LIB="$TMP/rust-lib"
 IMAGE="zed-pkg-test/cargo-workspace:${GITHUB_SHA:-local}"
+HOST_UID="$(id -u)"
+HOST_GID="$(id -g)"
 
 rm -rf "$CONTEXT" "$REGISTRY" "$ZED_HOME" "$CARGO_HOME_DIR" "$LIB"
 mkdir -p "$CONTEXT" "$REGISTRY" "$ZED_HOME" "$CARGO_HOME_DIR"
@@ -33,10 +35,13 @@ docker build -q -f "$ROOT/.github/docker/Dockerfile" -t "$IMAGE" "$CONTEXT"
 
 clone_at https://github.com/zed-pkg-test/rust-lib.git "$RUST_LIB_REF" "$LIB"
 docker run --rm \
+  --user "$HOST_UID:$HOST_GID" \
+  -e HOME=/tmp/zed-user \
   -v "$LIB:/source:ro" \
   -v "$REGISTRY:/registry" \
   -v "$CARGO_HOME_DIR:/cargo-home" \
   -w /tmp "$IMAGE" sh -euc '
+    mkdir -p "$HOME"
     cp -a /source /tmp/package
     chmod -R u+w /tmp/package
     cd /tmp/package
@@ -52,11 +57,14 @@ CARGO_HASH="$(git -C "$ROOT" hash-object fixtures/cargo-workspace/Cargo.lock)"
 # Development layout: product-generated Cargo wiring must match the fragment the
 # consumer deliberately merged into .cargo/config.toml.
 docker run --rm \
+  --user "$HOST_UID:$HOST_GID" \
+  -e HOME=/tmp/zed-user \
   -v "$FIXTURE:/work" \
   -v "$REGISTRY:/registry:ro" \
   -v "$ZED_HOME:/zed-home" \
   -v "$CARGO_HOME_DIR:/cargo-home" \
   -w /work "$IMAGE" sh -euc '
+    mkdir -p "$HOME"
     zed install --registry file:///registry --home /zed-home --install-mode symlink
     test -L .vendor/.zed/zed-pkg-test/rust-lib
     test -f .zpkg.lock
@@ -81,9 +89,12 @@ ZPKG_HASH="$(sha256sum "$FIXTURE/.zpkg.lock" | cut -d ' ' -f1)"
 
 # The symlink must not appear portable when its Zed store is absent.
 if docker run --rm --network none \
+  --user "$HOST_UID:$HOST_GID" \
+  -e HOME=/tmp/cargo-user \
   -v "$FIXTURE:/work:ro" \
   -v "$CARGO_HOME_DIR:/cargo-home" \
   -w /work rust:1.97-bookworm sh -euc '
+    mkdir -p "$HOME"
     CARGO_HOME=/cargo-home CARGO_TARGET_DIR=/tmp/target cargo run --locked --offline -p workspace-app
   '
 then
@@ -94,11 +105,14 @@ fi
 # Frozen copy mode must preserve both locks and run with no Zed store, registry,
 # or network after Cargo's registry cache is warm.
 docker run --rm \
+  --user "$HOST_UID:$HOST_GID" \
+  -e HOME=/tmp/zed-user \
   -v "$FIXTURE:/work" \
   -v "$REGISTRY:/registry:ro" \
   -v "$ZED_HOME:/zed-home" \
   -v "$CARGO_HOME_DIR:/cargo-home" \
   -w /work "$IMAGE" sh -euc '
+    mkdir -p "$HOME"
     zed install --frozen --registry file:///registry --home /zed-home --install-mode copy
     test ! -L .vendor/.zed/zed-pkg-test/rust-lib
     test -z "$(find .vendor/.zed -type l -print -quit)"
@@ -107,9 +121,12 @@ test "$(git -C "$ROOT" hash-object fixtures/cargo-workspace/Cargo.lock)" = "$CAR
 test "$(sha256sum "$FIXTURE/.zpkg.lock" | cut -d ' ' -f1)" = "$ZPKG_HASH"
 
 docker run --rm --network none \
+  --user "$HOST_UID:$HOST_GID" \
+  -e HOME=/tmp/cargo-user \
   -v "$FIXTURE:/work:ro" \
   -v "$CARGO_HOME_DIR:/cargo-home" \
   -w /work rust:1.97-bookworm sh -euc '
+    mkdir -p "$HOME"
     CARGO_HOME=/cargo-home CARGO_TARGET_DIR=/tmp/target cargo run --locked --offline -q -p workspace-app
     CARGO_HOME=/cargo-home CARGO_TARGET_DIR=/tmp/target cargo test --locked --offline -q --workspace --all-targets
   '
