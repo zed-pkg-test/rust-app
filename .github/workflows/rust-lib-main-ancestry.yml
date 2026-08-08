@@ -13,6 +13,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  RUST_LIB_REVIEWED_MERGE_REF: 49e3a6bc36bf0f96e971a1edc0c183fd1dcfa55b
+
 jobs:
   verify:
     runs-on: ubuntu-24.04
@@ -36,6 +39,7 @@ jobs:
           set -euo pipefail
           bash -n scripts/verify-rust-lib-main-ancestry.sh
           bash -n tests/rust-lib-main-ancestry.sh
+          [[ "$RUST_LIB_REVIEWED_MERGE_REF" =~ ^[0-9a-f]{40}$ ]]
 
       - name: Prove local negative and positive cases
         run: bash tests/rust-lib-main-ancestry.sh
@@ -49,22 +53,24 @@ jobs:
           import sys
           from pathlib import Path
 
-          paths = [
-              Path(".github/workflows/zed-e2e.yml"),
-              Path(".github/workflows/cargo-workspace-e2e.yml"),
-          ]
+          required = {
+              ".github/workflows/zed-e2e.yml",
+              ".github/workflows/cargo-workspace-e2e.yml",
+          }
           pins = {}
           pattern = re.compile(r"(?m)^  RUST_LIB_REF: ([0-9a-f]{40})$")
-          for path in paths:
+          for path in sorted(Path(".github/workflows").glob("*.yml")):
               matches = pattern.findall(path.read_text(encoding="utf-8"))
-              assert len(matches) == 1, f"{path} must declare exactly one RUST_LIB_REF"
-              pins[str(path)] = matches[0]
+              if matches:
+                  assert len(matches) == 1, f"{path} declares multiple RUST_LIB_REF values"
+                  pins[str(path)] = matches[0]
+          assert required.issubset(pins), (required, pins)
           assert len(set(pins.values())) == 1, pins
           with Path(sys.argv[1]).open("a", encoding="utf-8") as handle:
               handle.write(f"RUST_LIB_REF={next(iter(pins.values()))}\n")
           PY
 
-      - name: Verify the certified pin is in rust-lib main ancestry
+      - name: Verify the certified pin reached main through the reviewed merge
         shell: bash
         run: |
           set -euo pipefail
