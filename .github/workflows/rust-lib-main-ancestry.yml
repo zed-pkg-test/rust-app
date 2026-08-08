@@ -1,0 +1,81 @@
+name: rust-lib main ancestry ratchet
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          show-progress: false
+
+      - name: Validate workflow
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: .github/workflows/rust-lib-main-ancestry.yml
+
+      - name: Validate executable scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/verify-rust-lib-main-ancestry.sh
+          bash -n tests/rust-lib-main-ancestry.sh
+
+      - name: Prove local negative and positive cases
+        run: bash tests/rust-lib-main-ancestry.sh
+
+      - name: Require one shared immutable rust-lib pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$GITHUB_ENV" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          paths = [
+              Path(".github/workflows/zed-e2e.yml"),
+              Path(".github/workflows/cargo-workspace-e2e.yml"),
+          ]
+          pins = {}
+          pattern = re.compile(r"(?m)^  RUST_LIB_REF: ([0-9a-f]{40})$")
+          for path in paths:
+              matches = pattern.findall(path.read_text(encoding="utf-8"))
+              assert len(matches) == 1, f"{path} must declare exactly one RUST_LIB_REF"
+              pins[str(path)] = matches[0]
+          assert len(set(pins.values())) == 1, pins
+          with Path(sys.argv[1]).open("a", encoding="utf-8") as handle:
+              handle.write(f"RUST_LIB_REF={next(iter(pins.values()))}\n")
+          PY
+
+      - name: Verify the certified pin is in rust-lib main ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts/verify-rust-lib-main-ancestry.sh \
+            "$RUNNER_TEMP/rust-lib-main-ancestry.json"
+
+      - name: Upload bounded ancestry evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rust-lib-main-ancestry
+          path: ${{ runner.temp }}/rust-lib-main-ancestry.json
+          if-no-files-found: warn
+          retention-days: 7
