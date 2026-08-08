@@ -1,0 +1,143 @@
+name: Windows file-registry candidate certification
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/windows-file-registry-candidate.yml
+  workflow_dispatch:
+    inputs:
+      zed_cli_ref:
+        description: Exact 40-character zed-pkg/zed-cli commit to certify
+        required: false
+        default: 8ed61969f8bd9ed62aad9358f4b77982af36eb1f
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-file-registry-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  ZED_CLI_REF: ${{ inputs.zed_cli_ref || '8ed61969f8bd9ed62aad9358f4b77982af36eb1f' }}
+  ZED_INTERFACES_REF: dc0e0a0620b9462817950b552d3d334a184b1cb1
+  RUST_LIB_REF: f2534ffafbc4f7e900075dfc8e48b9259aced2fe
+  CARGO_TERM_COLOR: always
+
+jobs:
+  certify:
+    name: Exact candidate on Windows Server 2025
+    runs-on: windows-2025
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out certification repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Check out exact Zed candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: zed-pkg/zed-cli
+          ref: ${{ env.ZED_CLI_REF }}
+          path: zed-cli
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Check out pinned Zed interfaces
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: zed-pkg/zed-interfaces
+          ref: ${{ env.ZED_INTERFACES_REF }}
+          path: zed-interfaces
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Check out exact test-org library fixture
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: zed-pkg-test/rust-lib
+          ref: ${{ env.RUST_LIB_REF }}
+          path: rust-lib-fixture
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Verify immutable inputs
+        run: |
+          foreach ($value in @($env:ZED_CLI_REF, $env:ZED_INTERFACES_REF, $env:RUST_LIB_REF)) {
+            if ($value -notmatch '^[0-9a-f]{40}$') { throw "mutable or invalid ref: $value" }
+          }
+          if ((git -C zed-cli rev-parse HEAD).Trim() -ne $env:ZED_CLI_REF) { throw 'zed-cli ref mismatch' }
+          if ((git -C zed-interfaces rev-parse HEAD).Trim() -ne $env:ZED_INTERFACES_REF) { throw 'zed-interfaces ref mismatch' }
+          if ((git -C rust-lib-fixture rev-parse HEAD).Trim() -ne $env:RUST_LIB_REF) { throw 'rust-lib ref mismatch' }
+
+      - name: Install stable Rust and build exact candidate
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          cargo build --locked --manifest-path zed-cli/Cargo.toml --bin zed
+
+      - name: Publish, inspect metadata, and install through canonical file URI
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'zed-pkg-test file registry certification'
+          $registry = Join-Path $root 'registry with spaces'
+          $zedHome = Join-Path $root 'home'
+          $app = Join-Path $root 'consumer app'
+          Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $registry, $zedHome, $app | Out-Null
+
+          $registryUri = python -c "from pathlib import Path; print(Path(r'$registry').resolve().as_uri())"
+          if (-not $registryUri.StartsWith('file:///')) { throw "unexpected registry URI: $registryUri" }
+          if ($registryUri -notmatch '%20') { throw "registry URI did not encode spaces: $registryUri" }
+
+          $zed = (Resolve-Path zed-cli/target/debug/zed.exe).Path
+          Push-Location rust-lib-fixture
+          try {
+            & $zed publish --registry $registryUri --skip-vcs-checks
+            if ($LASTEXITCODE -ne 0) { throw "publish failed with exit $LASTEXITCODE" }
+          } finally { Pop-Location }
+
+          $version = Join-Path $registry 'packages/zed-pkg-test/rust-lib/versions/1.0.0.json'
+          if (-not (Test-Path $version)) { throw "published version metadata missing: $version" }
+          $metadata = Get-Content -Raw $version | ConvertFrom-Json
+          $downloadUrl = [string]$metadata.download_url
+          if (-not $downloadUrl.StartsWith('file:///')) { throw "non-canonical download_url: $downloadUrl" }
+          if ($downloadUrl -notmatch '%20') { throw "download_url did not encode spaces: $downloadUrl" }
+
+          @'
+          [package]
+          org = "zed-pkg-test"
+          name = "windows-file-registry-consumer"
+          version = "0.1.0"
+          license = "MIT"
+
+          [package.repository]
+          vcs = "git"
+          url = "https://github.com/zed-pkg-test/rust-app"
+
+          [install]
+          dir = ".vendor/.zed"
+
+          [dependencies]
+          "zed-pkg-test/rust-lib" = "^1"
+          '@ | Set-Content -Encoding utf8 (Join-Path $app '.zpkg.toml')
+
+          Push-Location $app
+          try {
+            & $zed install --registry $registryUri --home $zedHome --install-mode copy
+            if ($LASTEXITCODE -ne 0) { throw "install failed with exit $LASTEXITCODE" }
+          } finally { Pop-Location }
+
+          $materialized = Join-Path $app '.vendor/.zed/zed-pkg-test/rust-lib'
+          if (-not (Test-Path $materialized -PathType Container)) {
+            throw "materialized package missing: $materialized"
+          }
