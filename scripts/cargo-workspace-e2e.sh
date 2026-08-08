@@ -31,6 +31,20 @@ clone_at() {
 
 clone_at https://github.com/zed-pkg/zed-interfaces.git "$ZED_INTERFACES_REF" "$CONTEXT/zed-interfaces"
 clone_at https://github.com/zed-pkg/zed-cli.git "$ZED_CLI_REF" "$CONTEXT/zed-cli"
+python3 - "$CONTEXT/zed-cli/Cargo.toml" "$ZED_INTERFACES_REF" <<'PY'
+import sys
+import tomllib
+from pathlib import Path
+
+manifest_path = Path(sys.argv[1])
+expected = sys.argv[2]
+with manifest_path.open("rb") as handle:
+    manifest = tomllib.load(handle)
+dependency = manifest["dependencies"]["zed-interfaces"]
+assert dependency["git"] == "https://github.com/zed-pkg/zed-interfaces.git"
+assert dependency["rev"] == expected
+PY
+grep -Fq "$ZED_INTERFACES_REF" "$CONTEXT/zed-cli/Cargo.lock"
 docker build -q -f "$ROOT/.github/docker/Dockerfile" -t "$IMAGE" "$CONTEXT"
 
 clone_at https://github.com/zed-pkg-test/rust-lib.git "$RUST_LIB_REF" "$LIB"
