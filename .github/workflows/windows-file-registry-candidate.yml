@@ -9,7 +9,7 @@ on:
       zed_cli_ref:
         description: Exact 40-character zed-pkg/zed-cli commit to certify
         required: false
-        default: e773b2d6866b2c10dc3fd2cd6c2db5c8f578d29f
+        default: 8ed61969f8bd9ed62aad9358f4b77982af36eb1f
         type: string
 
 permissions:
@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ZED_CLI_REF: ${{ inputs.zed_cli_ref || 'e773b2d6866b2c10dc3fd2cd6c2db5c8f578d29f' }}
+  ZED_CLI_REF: ${{ inputs.zed_cli_ref || '8ed61969f8bd9ed62aad9358f4b77982af36eb1f' }}
   ZED_INTERFACES_REF: dc0e0a0620b9462817950b552d3d334a184b1cb1
   RUST_LIB_REF: f2534ffafbc4f7e900075dfc8e48b9259aced2fe
   CARGO_TERM_COLOR: always
@@ -90,10 +90,10 @@ jobs:
         run: |
           $root = Join-Path $env:RUNNER_TEMP 'zed-pkg-test file registry certification'
           $registry = Join-Path $root 'registry with spaces'
-          $home = Join-Path $root 'home'
+          $zedHome = Join-Path $root 'home'
           $app = Join-Path $root 'consumer app'
           Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Force $registry, $home, $app | Out-Null
+          New-Item -ItemType Directory -Force $registry, $zedHome, $app | Out-Null
 
           $registryUri = python -c "from pathlib import Path; print(Path(r'$registry').resolve().as_uri())"
           if (-not $registryUri.StartsWith('file:///')) { throw "unexpected registry URI: $registryUri" }
@@ -133,7 +133,7 @@ jobs:
 
           Push-Location $app
           try {
-            & $zed install --registry $registryUri --home $home --install-mode copy
+            & $zed install --registry $registryUri --home $zedHome --install-mode copy
             if ($LASTEXITCODE -ne 0) { throw "install failed with exit $LASTEXITCODE" }
           } finally { Pop-Location }
 
