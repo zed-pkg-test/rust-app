@@ -9,7 +9,7 @@ on:
       zed_cli_ref:
         description: Exact 40-character zed-pkg/zed-cli commit to certify
         required: false
-        default: bb0a9deeda2cfd4fab69f69de0bd1cb734659c83
+        default: d9da1e3ccfd98ee8c250e7d35a18dd22f398d4dc
         type: string
 
 permissions:
@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ZED_CLI_REF: ${{ inputs.zed_cli_ref || 'bb0a9deeda2cfd4fab69f69de0bd1cb734659c83' }}
+  ZED_CLI_REF: ${{ inputs.zed_cli_ref || 'd9da1e3ccfd98ee8c250e7d35a18dd22f398d4dc' }}
   ZED_INTERFACES_REF: dc0e0a0620b9462817950b552d3d334a184b1cb1
   CARGO_TERM_COLOR: always
 
