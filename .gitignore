@@ -2,4 +2,3 @@ target/
 .vendor/
 .zed/
 .zpkg.lock
-Cargo.lock
