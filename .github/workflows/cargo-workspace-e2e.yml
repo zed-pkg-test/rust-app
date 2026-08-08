@@ -38,7 +38,9 @@ jobs:
       - name: Check out exact revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          show-progress: false
 
       - name: Validate workflow
         uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
@@ -113,7 +115,9 @@ jobs:
       - name: Check out exact revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          show-progress: false
 
       - name: Install pinned Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -234,7 +238,9 @@ jobs:
       - name: Check out exact revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          show-progress: false
 
       - name: Run pinned Zed adapter and Cargo workspace suite
         shell: bash
@@ -244,7 +250,7 @@ jobs:
 
       - name: Upload interoperability diagnostics
         if: ${{ always() }}
-        uses: actions/upload-artifact@ea165f8d65e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cargo-workspace-e2e-log
           path: ${{ runner.temp }}/cargo-workspace-e2e.log
