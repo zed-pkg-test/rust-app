@@ -1,0 +1,252 @@
+name: Cargo workspace and Zed interoperability
+
+on:
+  pull_request:
+    paths:
+      - .github/docker/Dockerfile
+      - .github/workflows/cargo-workspace-e2e.yml
+      - docs/cargo-workspace-interop.md
+      - fixtures/cargo-workspace/**
+      - scripts/cargo-workspace-e2e.sh
+  push:
+    branches: [main]
+    paths:
+      - .github/docker/Dockerfile
+      - .github/workflows/cargo-workspace-e2e.yml
+      - docs/cargo-workspace-interop.md
+      - fixtures/cargo-workspace/**
+      - scripts/cargo-workspace-e2e.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ZED_INTERFACES_REF: a23cdd2ac509a39ca6fd6d21a3774fdd3a0f7660
+  ZED_CLI_REF: bf1dc05e05900748a44ee02e7c507fd65bab4c7a
+  RUST_LIB_REF: f3c4e33cd0e5726b2c668c0306936f01674261fa
+
+jobs:
+  workflow-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate workflow
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: .github/workflows/cargo-workspace-e2e.yml
+
+      - name: Validate executable suite
+        run: bash -n scripts/cargo-workspace-e2e.sh
+
+      - name: Verify immutable references and manifest ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          for value in "$ZED_INTERFACES_REF" "$ZED_CLI_REF" "$RUST_LIB_REF"; do
+            [[ "$value" =~ ^[0-9a-f]{40}$ ]]
+          done
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          root = Path("fixtures/cargo-workspace")
+          with (root / "Cargo.toml").open("rb") as handle:
+              cargo = tomllib.load(handle)
+          with (root / ".zpkg.toml").open("rb") as handle:
+              zed = tomllib.load(handle)
+          with (root / ".cargo/config.toml").open("rb") as handle:
+              config = tomllib.load(handle)
+          with (root / "Cargo.lock").open("rb") as handle:
+              lock = tomllib.load(handle)
+
+          workspace = cargo["workspace"]
+          assert workspace["resolver"] == "2"
+          assert workspace["members"] == ["crates/app", "crates/support"]
+          assert workspace["package"] == {
+              "version": "0.1.0",
+              "edition": "2021",
+              "rust-version": "1.88",
+              "license": "MIT",
+          }
+          assert workspace["dependencies"]["zed-rust-lib"] == {
+              "package": "rust-lib",
+              "version": "=1.0.1",
+              "default-features": False,
+          }
+          assert workspace["dependencies"]["unicode-ident"] == "=1.0.24"
+          assert config["paths"] == [".vendor/.zed/zed-pkg-test/rust-lib"]
+          assert config["patch"]["crates-io"]["rust-lib"]["path"] == config["paths"][0]
+          assert zed["dependencies"] == {"zed-pkg-test/rust-lib": "^1.0.1"}
+          assert lock["version"] == 4
+          assert {package["name"] for package in lock["package"]} == {
+              "itoa",
+              "rust-lib",
+              "unicode-ident",
+              "workspace-app",
+              "workspace-support",
+          }
+          assert not (root / ".zpkg.lock").exists()
+          PY
+
+  cargo-matrix:
+    needs: workflow-contract
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04
+          - macos-15
+          - windows-2025
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: "1.97.0"
+          components: rustfmt, clippy
+
+      - name: Materialize exact Zed package fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          target=fixtures/cargo-workspace/.vendor/.zed/zed-pkg-test/rust-lib
+          mkdir -p "$(dirname "$target")"
+          git init -q "$target"
+          git -C "$target" remote add origin https://github.com/zed-pkg-test/rust-lib.git
+          git -C "$target" fetch --depth 1 origin "$RUST_LIB_REF"
+          git -C "$target" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$target" rev-parse HEAD)" = "$RUST_LIB_REF"
+
+      - name: Run locked Cargo workspace matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd fixtures/cargo-workspace
+          cargo_lock_hash="$(git hash-object Cargo.lock)"
+          cargo fmt --all -- --check
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+          cargo test --locked --workspace --all-targets
+          cargo run --locked --quiet -p workspace-app
+          cargo metadata --locked --format-version 1 > cargo-metadata.json
+          cargo tree --locked -p workspace-app -e features > cargo-features.txt
+          cargo run --locked --offline --quiet -p workspace-app
+          cargo test --locked --offline --workspace --all-targets
+          test "$(git hash-object Cargo.lock)" = "$cargo_lock_hash"
+          test ! -e .zpkg.lock
+
+      - name: Validate workspace, alias, target, and registry provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("fixtures/cargo-workspace")
+          metadata = json.loads((root / "cargo-metadata.json").read_text())
+          packages = {package["name"]: package for package in metadata["packages"]}
+          assert {"workspace-app", "workspace-support"} == {
+              package["name"]
+              for package in metadata["packages"]
+              if package["id"] in metadata["workspace_members"]
+          }
+          assert packages["rust-lib"]["version"] == "1.0.1"
+          assert packages["rust-lib"]["source"] is None
+          assert packages["itoa"]["version"] == "1.0.18"
+          assert packages["unicode-ident"]["version"] == "1.0.24"
+          assert packages["itoa"]["source"].startswith("registry+")
+          assert packages["unicode-ident"]["source"].startswith("registry+")
+
+          renamed = [
+              dependency
+              for dependency in packages["workspace-app"]["dependencies"]
+              if dependency["name"] == "rust-lib"
+          ]
+          assert {dependency["kind"] for dependency in renamed} == {"build", "dev"}
+          assert all(dependency["rename"] == "zed-rust-lib" for dependency in renamed)
+          build = next(dependency for dependency in renamed if dependency["kind"] == "build")
+          dev = next(dependency for dependency in renamed if dependency["kind"] == "dev")
+          assert build["uses_default_features"] is False
+          assert build["features"] == []
+          assert dev["features"] == ["uppercase"]
+
+          support = packages["workspace-support"]["dependencies"]
+          assert len(support) == 1
+          assert support[0]["name"] == "rust-lib"
+          assert support[0]["rename"] == "zed-rust-lib"
+          assert support[0]["kind"] is None
+          assert support[0]["features"] == ["uppercase"]
+          assert support[0]["target"] == "cfg(any(unix, windows))"
+          PY
+
+      - name: Upload Cargo workspace provenance
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cargo-workspace-provenance-${{ matrix.os }}
+          path: |
+            fixtures/cargo-workspace/cargo-metadata.json
+            fixtures/cargo-workspace/cargo-features.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Verify source and lock cleanliness
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf \
+            fixtures/cargo-workspace/.vendor \
+            fixtures/cargo-workspace/.zed \
+            fixtures/cargo-workspace/.zpkg.lock \
+            fixtures/cargo-workspace/target \
+            fixtures/cargo-workspace/cargo-metadata.json \
+            fixtures/cargo-workspace/cargo-features.txt
+          git diff --exit-code -- fixtures/cargo-workspace
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+  zed-registry-workspace-e2e:
+    needs: workflow-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run pinned Zed adapter and Cargo workspace suite
+        shell: bash
+        run: |
+          set -o pipefail
+          bash scripts/cargo-workspace-e2e.sh 2>&1 | tee "$RUNNER_TEMP/cargo-workspace-e2e.log"
+
+      - name: Upload interoperability diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65e75b540449e92b4886f43607fa02
+        with:
+          name: cargo-workspace-e2e-log
+          path: ${{ runner.temp }}/cargo-workspace-e2e.log
+          if-no-files-found: warn
+          retention-days: 7
