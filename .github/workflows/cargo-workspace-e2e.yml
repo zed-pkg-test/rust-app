@@ -26,8 +26,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ZED_INTERFACES_REF: a23cdd2ac509a39ca6fd6d21a3774fdd3a0f7660
-  ZED_CLI_REF: bf1dc05e05900748a44ee02e7c507fd65bab4c7a
+  ZED_INTERFACES_REF: d1bf8ef7c88a75292cbe8d697bfd269f30d62e2b
+  ZED_CLI_REF: de774cc9fc5b786d85e9b5ff19251675f0e9391b
   RUST_LIB_REF: f3c4e33cd0e5726b2c668c0306936f01674261fa
 
 jobs:
