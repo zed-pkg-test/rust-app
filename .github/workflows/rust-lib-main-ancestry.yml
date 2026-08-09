@@ -1,0 +1,150 @@
+name: rust-lib main ancestry ratchet
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          show-progress: false
+
+      - name: Validate workflow
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: .github/workflows/rust-lib-main-ancestry.yml
+
+      - name: Validate executable scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/verify-rust-lib-main-ancestry.sh
+          bash -n tests/rust-lib-main-ancestry.sh
+
+      - name: Prove local negative and positive cases
+        run: bash tests/rust-lib-main-ancestry.sh
+
+      - name: Validate and compile the reviewed pin policy
+        env:
+          POLICY_TSV: ${{ runner.temp }}/rust-lib-pin-policy.tsv
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$POLICY_TSV" <<'PY'
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          policy_path = Path(".github/rust-lib-pin-policy.json")
+          policy = json.loads(policy_path.read_text(encoding="utf-8"))
+          assert set(policy) == {"schema", "repository", "pin_sets"}
+          assert policy["schema"] == "zed-pkg-test/rust-lib-pin-policy/v1"
+          assert policy["repository"] == "https://github.com/zed-pkg-test/rust-lib.git"
+          assert isinstance(policy["pin_sets"], list) and policy["pin_sets"]
+
+          sha = re.compile(r"^[0-9a-f]{40}$")
+          identifier = re.compile(r"^[a-z0-9][a-z0-9-]{0,79}$")
+          declaration = re.compile(r"(?m)^  RUST_LIB_REF: ([0-9a-f]{40})$")
+          expected_fields = {
+              "id",
+              "purpose",
+              "certified_ref",
+              "reviewed_merge_ref",
+              "workflows",
+          }
+
+          declared = {}
+          workflow_paths = sorted(Path(".github/workflows").glob("*.yml"))
+          workflow_paths += sorted(Path(".github/workflows").glob("*.yaml"))
+          for path in workflow_paths:
+              matches = declaration.findall(path.read_text(encoding="utf-8"))
+              if matches:
+                  assert len(matches) == 1, f"{path} declares multiple RUST_LIB_REF values"
+                  declared[str(path)] = matches[0]
+
+          ids = set()
+          policy_workflows = {}
+          rows = []
+          for pin_set in policy["pin_sets"]:
+              assert isinstance(pin_set, dict) and set(pin_set) == expected_fields
+              assert identifier.fullmatch(pin_set["id"])
+              assert pin_set["id"] not in ids
+              ids.add(pin_set["id"])
+              assert isinstance(pin_set["purpose"], str)
+              assert 20 <= len(pin_set["purpose"]) <= 240
+              assert sha.fullmatch(pin_set["certified_ref"])
+              assert sha.fullmatch(pin_set["reviewed_merge_ref"])
+              assert isinstance(pin_set["workflows"], list) and pin_set["workflows"]
+              assert pin_set["workflows"] == sorted(set(pin_set["workflows"]))
+              for workflow in pin_set["workflows"]:
+                  assert workflow.startswith(".github/workflows/")
+                  assert Path(workflow).is_file(), workflow
+                  assert workflow not in policy_workflows, workflow
+                  policy_workflows[workflow] = pin_set["certified_ref"]
+              rows.append(
+                  (
+                      pin_set["id"],
+                      pin_set["certified_ref"],
+                      pin_set["reviewed_merge_ref"],
+                  )
+              )
+
+          assert set(declared) == set(policy_workflows), {
+              "undeclared_workflow_pins": sorted(set(declared) - set(policy_workflows)),
+              "missing_workflow_pins": sorted(set(policy_workflows) - set(declared)),
+          }
+          for workflow, expected in policy_workflows.items():
+              assert declared[workflow] == expected, (workflow, declared[workflow], expected)
+
+          output = Path(sys.argv[1])
+          output.write_text(
+              "".join("\t".join(row) + "\n" for row in rows),
+              encoding="utf-8",
+          )
+          PY
+          test -s "$POLICY_TSV"
+
+      - name: Verify every certified pin reached main through its reviewed merge
+        env:
+          POLICY_TSV: ${{ runner.temp }}/rust-lib-pin-policy.tsv
+          EVIDENCE_DIR: ${{ runner.temp }}/rust-lib-main-ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          while IFS=$'\t' read -r id certified_ref reviewed_merge_ref; do
+            RUST_LIB_REF="$certified_ref" \
+            RUST_LIB_REVIEWED_MERGE_REF="$reviewed_merge_ref" \
+              scripts/verify-rust-lib-main-ancestry.sh \
+                "$EVIDENCE_DIR/$id.json"
+          done < "$POLICY_TSV"
+          test "$(find "$EVIDENCE_DIR" -type f -name '*.json' | wc -l)" -gt 0
+
+      - name: Upload bounded ancestry evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rust-lib-main-ancestry
+          path: |
+            ${{ runner.temp }}/rust-lib-main-ancestry/*.json
+            ${{ runner.temp }}/rust-lib-pin-policy.tsv
+            .github/rust-lib-pin-policy.json
+          if-no-files-found: warn
+          retention-days: 7

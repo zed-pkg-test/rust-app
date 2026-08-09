@@ -1,0 +1,10 @@
+[package]
+name = "workspace-support"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[target.'cfg(any(unix, windows))'.dependencies]
+zed-rust-lib = { workspace = true, features = ["uppercase"] }
