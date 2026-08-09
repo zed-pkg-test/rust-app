@@ -1,0 +1,97 @@
+name: Registry URL candidate quality
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/registry-url-quality-candidate.yml
+  workflow_dispatch:
+    inputs:
+      zed_cli_ref:
+        description: Exact 40-character zed-pkg/zed-cli commit to certify
+        required: false
+        default: d9da1e3ccfd98ee8c250e7d35a18dd22f398d4dc
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: registry-url-quality-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  ZED_CLI_REF: ${{ inputs.zed_cli_ref || 'd9da1e3ccfd98ee8c250e7d35a18dd22f398d4dc' }}
+  ZED_INTERFACES_REF: dc0e0a0620b9462817950b552d3d334a184b1cb1
+  CARGO_TERM_COLOR: always
+
+jobs:
+  quality:
+    name: Registry URL quality / ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            label: Linux
+          - os: windows-2025
+            label: Windows
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out certification repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Check out exact Zed candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: zed-pkg/zed-cli
+          ref: ${{ env.ZED_CLI_REF }}
+          path: zed-cli
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Check out pinned Zed interfaces
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: zed-pkg/zed-interfaces
+          ref: ${{ env.ZED_INTERFACES_REF }}
+          path: zed-interfaces
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Verify immutable inputs
+        run: |
+          set -euo pipefail
+          [[ "$ZED_CLI_REF" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$ZED_INTERFACES_REF" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git -C zed-cli rev-parse HEAD)" = "$ZED_CLI_REF"
+          test "$(git -C zed-interfaces rev-parse HEAD)" = "$ZED_INTERFACES_REF"
+
+      - name: Install stable Rust with lint/format components
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy
+          rustup default stable
+          rustc --version --verbose
+          cargo --version --verbose
+
+      - name: Format registry URL candidate
+        working-directory: zed-cli
+        run: cargo fmt --all --check
+
+      - name: Run focused registry tests
+        working-directory: zed-cli
+        run: cargo test --locked --lib registry::tests -- --nocapture
+
+      - name: Run strict library Clippy
+        working-directory: zed-cli
+        run: cargo clippy --locked --lib -- -D warnings

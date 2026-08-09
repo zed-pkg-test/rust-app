@@ -1,0 +1,5 @@
+[net]
+retry = 2
+
+[http]
+timeout = 30
