@@ -1,12 +1,9 @@
 # rust-app (`zed-pkg-test/rust-app`)
 
-Executable interoperability fixture for using Zed packages as ordinary Cargo
-path dependencies while Cargo continues to own registry resolution, features,
-build dependencies, and `Cargo.lock`.
-
-This is a fixture, not a production application. Its only purpose is to prove
-that a Rust/Cargo consumer can source one crate through Zed while Cargo retains
-ownership of ordinary Rust dependencies.
+`rust-app` is a deterministic interoperability fixture for **zed-pkg**. It is not a
+production application. Its only purpose is to prove that a Rust/Cargo consumer can
+source one crate through Zed while Cargo continues to own registry resolution,
+features, build dependencies, and `Cargo.lock`.
 
 ## Dependency graph
 
@@ -21,13 +18,14 @@ rust-app Cargo graph
   └── unicode-ident 1.0.24 (crates.io)
 ```
 
-`zed install` materializes `rust-lib` at
-`.vendor/.zed/zed-pkg-test/rust-lib`. Cargo then resolves that path package and
-its crates.io dependency exactly as it would any local crate. The Zed
-requirement itself is declared in `.zpkg.toml`; the exact versions above are the
-currently certified resolution of it.
+`.zpkg.toml` installs Zed-managed content beneath `.vendor/.zed`; `Cargo.toml`
+consumes the installed package as the path dependency
+`.vendor/.zed/zed-pkg-test/rust-lib`. Cargo then resolves that path package and its
+crates.io dependency exactly as it would any local crate.
 
 ## Certified boundaries
+
+These are the invariants the fixture currently proves:
 
 - `.zpkg.toml` contains only Zed package dependencies;
 - `Cargo.toml` contains Cargo registry/path/build dependencies and features;
@@ -39,36 +37,38 @@ currently certified resolution of it.
 - symlink mode works while the Zed content store is mounted;
 - frozen copy mode is portable to a fresh container;
 - the copied project runs with `cargo --locked --offline` and no network;
-- changing a Cargo requirement fails under `--locked` without changing the Zed
-  lock.
+- changing a Cargo requirement fails under `--locked` without changing the Zed lock.
 
 ## Deterministic inputs and outputs
 
-Tracked package metadata, source, Zed manifest/lock data, and the exact
-`rust-lib` resolution are the fixture inputs. For identical pinned inputs, a
-clean install must reconstruct the same dependency graph and the same
-application/test output without reaching outside the declared install root.
+Tracked package metadata, source, Zed manifest/lock data, and the exact `rust-lib`
+resolution are the fixture inputs. For identical pinned inputs, a clean install must
+reconstruct the same dependency graph and the same application/test output without
+reaching outside the declared install root.
 
 The consuming assertion should install the fixture using the selected mode,
 compile/test with Cargo, and execute the app-level assertion that calls the
-Zed-provided crate. CI is expected to prove that the path dependency exists
-because Zed installed it, not because an undeclared workspace or machine-local
-path happened to be present.
+Zed-provided crate. CI is expected to prove that the path dependency exists because
+Zed installed it, not because an undeclared workspace or machine-local path happened
+to be present.
 
 ## Install-mode expectations
 
-- **Local developer mode:** symlink semantics are allowed and preferred when the
-  Zed local mode supports them.
+The certified boundaries above record that symlink and frozen-copy modes work. These
+are the requirements they have to keep satisfying:
+
+- **Local developer mode:** symlink semantics are allowed and preferred when the Zed
+  local mode supports them.
 - **Docker/OCI mode:** the installed dependency must be a self-contained copy.
   Container correctness must not rely on source-tree symlinks, host hardlinks,
   caches, or paths outside the image/install root.
-- **Filesystem boundary:** after a copy-mode install, removing the source/cache
-  must not invalidate the installed crate.
-- **Integrity:** checksum/provenance mismatches must fail closed rather than
-  silently substituting content.
+- **Filesystem boundary:** after a copy-mode install, removing the source/cache must
+  not invalidate the installed crate.
+- **Integrity:** checksum/provenance mismatches must fail closed rather than silently
+  substituting content.
 
-The shared canary implementation for these semantics belongs to DEN-588/DEN-591;
-this fixture consumes that contract instead of introducing a competing one.
+The shared canary implementation for these semantics belongs to DEN-588/DEN-591; this
+fixture consumes that contract instead of introducing a competing one.
 
 ## Local workflow
 
@@ -81,21 +81,21 @@ cargo test --locked --all-targets
 cargo run --locked --offline
 ```
 
-The repository E2E workflow builds an exact Zed CLI candidate, publishes an
-exact `rust-lib` candidate to a temporary file registry, and performs the full
+The repository E2E workflow builds an exact Zed CLI candidate, publishes an exact
+`rust-lib` candidate to a temporary file registry, and performs the full
 symlink/copy/offline/lock-isolation matrix without persistent registry writes.
 
 ## Expected failures
 
-A missing/incompatible `rust-lib`, invalid integrity metadata, an escaped
-filesystem boundary, or a Cargo path that was not materialized by Zed must
-produce an actionable failure. Cross-platform tests should assert stable failure
-classes/messages without timing-sensitive sleeps.
+A missing/incompatible `rust-lib`, invalid integrity metadata, an escaped filesystem
+boundary, or a Cargo path that was not materialized by Zed must produce an actionable
+failure. Cross-platform tests should assert stable failure classes/messages without
+timing-sensitive sleeps.
 
 ## Ownership and security
 
-The canonical owner is the `zed-pkg-test` GitHub organization. Repository
-transfers or renames must preserve graph history and package identity until
-consumers are repointed. See `agents.md` for automation rules. Sensitive
-security reports inherit the organization security/contact policy and must not
-be posted publicly with credentials or secrets.
+The canonical owner is the `zed-pkg-test` GitHub organization. Repository transfers or
+renames must preserve graph history and package identity until consumers are
+repointed. See `agents.md` for automation rules. Sensitive security reports inherit the
+organization security/contact policy and must not be posted publicly with credentials
+or secrets.
