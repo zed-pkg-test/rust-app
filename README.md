@@ -77,6 +77,21 @@ boundary, or a Cargo path that was not materialized by Zed must produce an actio
 failure. Cross-platform tests should assert stable failure classes/messages without
 timing-sensitive sleeps.
 
+## Local workflow
+
+Install the Zed dependency first, then run Cargo normally:
+
+```sh
+zed install --install-mode copy
+cargo run --locked
+cargo test --locked --all-targets
+cargo run --locked --offline
+```
+
+The repository E2E workflow builds an exact Zed CLI candidate, publishes an
+exact `rust-lib` candidate to a temporary file registry, and performs the full
+symlink/copy/offline/lock-isolation matrix without persistent registry writes.
+
 ## Ownership and security
 
 The canonical owner is the `zed-pkg-test` GitHub organization. Repository transfers or
