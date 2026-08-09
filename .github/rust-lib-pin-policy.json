@@ -1,0 +1,25 @@
+{
+  "schema": "zed-pkg-test/rust-lib-pin-policy/v1",
+  "repository": "https://github.com/zed-pkg-test/rust-lib.git",
+  "pin_sets": [
+    {
+      "id": "cargo-registry-interop-v1",
+      "purpose": "Current Cargo registry, feature, workspace, lock, and offline interoperability suites.",
+      "certified_ref": "f3c4e33cd0e5726b2c668c0306936f01674261fa",
+      "reviewed_merge_ref": "49e3a6bc36bf0f96e971a1edc0c183fd1dcfa55b",
+      "workflows": [
+        ".github/workflows/cargo-workspace-e2e.yml",
+        ".github/workflows/zed-e2e.yml"
+      ]
+    },
+    {
+      "id": "windows-file-registry-baseline-v1",
+      "purpose": "Historical Windows file-registry baseline at the reviewed rust-lib 1.0.0 merge.",
+      "certified_ref": "f2534ffafbc4f7e900075dfc8e48b9259aced2fe",
+      "reviewed_merge_ref": "f2534ffafbc4f7e900075dfc8e48b9259aced2fe",
+      "workflows": [
+        ".github/workflows/windows-file-registry-candidate.yml"
+      ]
+    }
+  ]
+}

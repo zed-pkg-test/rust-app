@@ -1,4 +1,4 @@
-name: zed e2e (rust + docker)
+name: Zed and Cargo interoperability
 
 on:
   pull_request:
@@ -14,16 +14,17 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ZED_INTERFACES_REF: 61f654d5e4ca718abc4a280a641472466689c278
-  ZED_CLI_REF: 359ea72e21027ed54a29fad95b05f38a1ea142c3
-  RUST_LIB_REF: f2534ffafbc4f7e900075dfc8e48b9259aced2fe
+  ZED_INTERFACES_REF: a23cdd2ac509a39ca6fd6d21a3774fdd3a0f7660
+  ZED_CLI_REF: bf1dc05e05900748a44ee02e7c507fd65bab4c7a
+  RUST_LIB_REF: f3c4e33cd0e5726b2c668c0306936f01674261fa
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+  workflow-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -35,17 +36,136 @@ jobs:
       - name: Validate executable test script
         run: bash -n scripts/zed-e2e.sh
 
+      - name: Verify immutable fixture references
+        shell: bash
+        run: |
+          set -euo pipefail
+          for value in \
+            "$ZED_INTERFACES_REF" \
+            "$ZED_CLI_REF" \
+            "$RUST_LIB_REF"
+          do
+            [[ "$value" =~ ^[0-9a-f]{40}$ ]]
+          done
+          test -f Cargo.lock
+          test ! -e .zpkg.lock
+
+  cargo-matrix:
+    needs: workflow-contract
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04
+          - macos-15
+          - windows-2025
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: "1.97.0"
+          components: rustfmt, clippy
+
+      - name: Materialize exact Zed package fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          target=.vendor/.zed/zed-pkg-test/rust-lib
+          mkdir -p "$(dirname "$target")"
+          git init -q "$target"
+          git -C "$target" remote add origin https://github.com/zed-pkg-test/rust-lib.git
+          git -C "$target" fetch --depth 1 origin "$RUST_LIB_REF"
+          git -C "$target" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$target" rev-parse HEAD)" = "$RUST_LIB_REF"
+
+      - name: Run locked Cargo matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo_lock_hash="$(git hash-object Cargo.lock)"
+          cargo fmt --all -- --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked --all-targets
+          cargo run --locked --quiet
+          cargo metadata --locked --format-version 1 > cargo-metadata.json
+          cargo tree --locked -e features > cargo-features.txt
+          cargo run --locked --offline --quiet
+          cargo test --locked --offline --all-targets
+          test "$(git hash-object Cargo.lock)" = "$cargo_lock_hash"
+          test ! -e .zpkg.lock
+
+      - name: Validate Cargo provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          metadata = json.loads(Path("cargo-metadata.json").read_text())
+          packages = {package["name"]: package for package in metadata["packages"]}
+          assert packages["rust-app"]["version"] == "0.2.0"
+          assert packages["rust-lib"]["version"] == "1.0.1"
+          assert packages["rust-lib"]["source"] is None
+          assert packages["itoa"]["version"] == "1.0.18"
+          assert packages["unicode-ident"]["version"] == "1.0.24"
+          assert packages["itoa"]["source"].startswith("registry+")
+          assert packages["unicode-ident"]["source"].startswith("registry+")
+          PY
+
+      - name: Upload Cargo provenance
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cargo-provenance-${{ matrix.os }}
+          path: |
+            cargo-metadata.json
+            cargo-features.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Verify source and lock cleanliness
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .vendor target cargo-metadata.json cargo-features.txt .zed .zpkg.lock
+          git diff --exit-code -- Cargo.toml Cargo.lock .zpkg.toml build.rs src tests
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+  zed-registry-e2e:
+    needs: workflow-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Run pinned cross-container interoperability suite
         shell: bash
         run: |
           set -o pipefail
-          bash scripts/zed-e2e.sh 2>&1 | tee "$RUNNER_TEMP/zed-rust-e2e.log"
+          bash scripts/zed-e2e.sh 2>&1 | tee "$RUNNER_TEMP/zed-cargo-e2e.log"
 
       - name: Upload interoperability diagnostics
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: zed-rust-e2e-log
-          path: ${{ runner.temp }}/zed-rust-e2e.log
+          name: zed-cargo-e2e-log
+          path: ${{ runner.temp }}/zed-cargo-e2e.log
           if-no-files-found: warn
           retention-days: 7
