@@ -1,12 +1,21 @@
 [package]
 name = "rust-app"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
-description = "A Rust app sourcing one crate via zed and the rest via cargo."
+rust-version = "1.88"
+resolver = "2"
+description = "A Rust app combining Zed path packages with Cargo registry dependencies."
 license = "MIT"
 publish = false
+build = "build.rs"
 
-# The ONE dependency sourced via zed: a cargo path dep pointing into the
-# [install].dir that `zed install` populates. crates.io deps would go here too.
+# Zed materializes this package. Cargo then consumes the result as an ordinary
+# path dependency with target-specific feature selection.
 [dependencies]
-rust-lib = { path = ".vendor/.zed/zed-pkg-test/rust-lib" }
+rust-lib = { path = ".vendor/.zed/zed-pkg-test/rust-lib", features = ["uppercase"] }
+unicode-ident = "=1.0.24"
+
+# Resolver v2 must keep this host build dependency's default feature set
+# separate from the target dependency's `uppercase` feature.
+[build-dependencies]
+rust-lib = { path = ".vendor/.zed/zed-pkg-test/rust-lib", default-features = false }

@@ -1,0 +1,17 @@
+[package]
+org = "zed-pkg-test"
+name = "cargo-workspace-consumer"
+version = "0.1.0"
+description = "Cargo workspace fixture consuming a Zed package through inherited dependencies."
+license = "MIT"
+language = "rust"
+
+[package.repository]
+vcs = "git"
+url = "https://github.com/zed-pkg-test/rust-app"
+
+[install]
+dir = ".vendor/.zed"
+
+[dependencies]
+"zed-pkg-test/rust-lib" = "^1.0.1"

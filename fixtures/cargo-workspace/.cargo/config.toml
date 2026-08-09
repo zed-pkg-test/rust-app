@@ -1,0 +1,11 @@
+# Consumer-owned merge of the fragment emitted by `zed install`.
+paths = [".vendor/.zed/zed-pkg-test/rust-lib"]
+
+[patch.crates-io]
+rust-lib = { path = ".vendor/.zed/zed-pkg-test/rust-lib" }
+
+[net]
+retry = 2
+
+[http]
+timeout = 30
