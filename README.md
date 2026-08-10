@@ -70,13 +70,6 @@ are the requirements they have to keep satisfying:
 The shared canary implementation for these semantics belongs to DEN-588/DEN-591; this
 fixture consumes that contract instead of introducing a competing one.
 
-## Expected failures
-
-A missing/incompatible `rust-lib`, invalid integrity metadata, an escaped filesystem
-boundary, or a Cargo path that was not materialized by Zed must produce an actionable
-failure. Cross-platform tests should assert stable failure classes/messages without
-timing-sensitive sleeps.
-
 ## Local workflow
 
 Install the Zed dependency first, then run Cargo normally:
@@ -88,9 +81,16 @@ cargo test --locked --all-targets
 cargo run --locked --offline
 ```
 
-The repository E2E workflow builds an exact Zed CLI candidate, publishes an
-exact `rust-lib` candidate to a temporary file registry, and performs the full
+The repository E2E workflow builds an exact Zed CLI candidate, publishes an exact
+`rust-lib` candidate to a temporary file registry, and performs the full
 symlink/copy/offline/lock-isolation matrix without persistent registry writes.
+
+## Expected failures
+
+A missing/incompatible `rust-lib`, invalid integrity metadata, an escaped filesystem
+boundary, or a Cargo path that was not materialized by Zed must produce an actionable
+failure. Cross-platform tests should assert stable failure classes/messages without
+timing-sensitive sleeps.
 
 ## Ownership and security
 
