@@ -69,7 +69,6 @@ are the requirements they have to keep satisfying:
 
 The shared canary implementation for these semantics belongs to DEN-588/DEN-591; this
 fixture consumes that contract instead of introducing a competing one.
-
 ## Local workflow
 
 Install the Zed dependency first, then run Cargo normally:
