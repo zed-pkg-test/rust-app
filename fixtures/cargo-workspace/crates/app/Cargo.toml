@@ -1,0 +1,18 @@
+[package]
+name = "workspace-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+build = "build.rs"
+
+[dependencies]
+workspace-support.workspace = true
+unicode-ident.workspace = true
+
+[build-dependencies]
+zed-rust-lib.workspace = true
+
+[dev-dependencies]
+zed-rust-lib = { workspace = true, features = ["uppercase"] }
