@@ -1,0 +1,43 @@
+name: Zed latest deps Rust consumer proof
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-rust-consumer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ZED_PKG_INTERACTIVE: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {path: source, fetch-depth: 0, persist-credentials: false}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: zed-pkg/zed-cli
+          ref: 611da9528940267235ed28391c3b05443380902d
+          path: zed-cli
+          persist-credentials: false
+      - name: Build exact Zed CLI
+        working-directory: zed-cli
+        run: |
+          cargo build --locked --bin zed
+          mkdir -p "$HOME/.local/bin"
+          install -m 0755 target/debug/zed "$HOME/.local/bin/zed"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Resolve and frozen-replay latest allowed Zed graph
+        working-directory: source
+        run: |
+          test ! -e .zpkg.lock
+          zed validate
+          zed install
+          zed validate --require-lock
+          zed install --frozen
+          test -e zed_modules/zed-pkg-test/rust-lib
+      - name: Compile and test Rust consumer
+        working-directory: source
+        run: zed develop --no-install -c 'cargo test --locked --all-targets'
+      - name: Pack consumer
+        working-directory: source
+        run: zed pack --out "$RUNNER_TEMP/zed-rust-consumer-proof"
