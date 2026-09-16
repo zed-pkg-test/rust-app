@@ -6,7 +6,7 @@ use ores_api_docs::{
 };
 
 fn main() {
-    let root = unique_temp();
+    let root = unique_temp("determinism");
     if root.exists() {
         fs::remove_dir_all(&root).unwrap();
     }
@@ -70,9 +70,81 @@ pub async fn page() {}
     assert!(assets_a[0].ends_with(".css"));
 
     reject_asset_path_traversal(&root, &pass_a.manifest_path);
-
     fs::remove_dir_all(&root).unwrap();
-    println!("zed-pkg-test ores-stack determinism and traversal smoke passed");
+
+    certify_static_generation_contract();
+    println!("zed-pkg-test ores-stack determinism, traversal, and static-generation smoke passed");
+}
+
+fn certify_static_generation_contract() {
+    let root = unique_temp("static-generation");
+    let page_dir = root.join("src/pages/packages/[name]");
+    fs::create_dir_all(&page_dir).unwrap();
+    fs::write(
+        page_dir.join("page.rs"),
+        r#"#[ores_page(
+renderer = "mash",
+delivery = "ssr_only",
+render = "static_only",
+title = "Package",
+tags("zed-pkg-test", "static-generation")
+)]
+pub async fn page() {}
+"#,
+    )
+    .unwrap();
+    fs::write(
+        page_dir.join("gen.rs"),
+        r#"#[ores_generate]
+pub async fn generate_static_params() {}
+"#,
+    )
+    .unwrap();
+
+    let pass_a = write_page_build_outputs(&root, &root.join(".ores-stack/static-a"))
+        .expect("valid static generator pass a");
+    let pass_b = write_page_build_outputs(&root, &root.join(".ores-stack/static-b"))
+        .expect("valid static generator pass b");
+    assert_eq!(
+        fs::read(&pass_a.manifest_path).unwrap(),
+        fs::read(&pass_b.manifest_path).unwrap(),
+        "static page plans must be byte-identical"
+    );
+    assert_eq!(
+        fs::read(&pass_a.compile_glue_path).unwrap(),
+        fs::read(&pass_b.compile_glue_path).unwrap(),
+        "static generator compile glue must be byte-identical"
+    );
+
+    let manifest = read_page_build_manifest(&pass_a.manifest_path).unwrap();
+    assert_eq!(manifest.routes.len(), 1);
+    let route = &manifest.routes[0];
+    assert_eq!(route.canonical_path, "/packages/{name}");
+    assert_eq!(route.render, "static_only");
+    assert_eq!(route.generator.as_deref(), Some("src/pages/packages/[name]/gen.rs"));
+    assert!(pass_a
+        .rerun_if_changed
+        .iter()
+        .any(|path| path.ends_with("src/pages/packages/[name]/gen.rs")));
+    let glue = fs::read_to_string(&pass_a.compile_glue_path).unwrap();
+    assert!(glue.contains("__ores_generate_static_params_boxed"));
+    assert!(glue.contains("GenerateStaticParamsFn"));
+
+    fs::write(
+        page_dir.join("gen.rs"),
+        r#"#[ores_generate]
+pub async fn enumerate_packages() {}
+"#,
+    )
+    .unwrap();
+    let error = write_page_build_outputs(&root, &root.join(".ores-stack/static-invalid"))
+        .expect_err("wrong generator function name must fail closed");
+    let message = error.to_string();
+    assert!(
+        message.contains("generate_static_params") || message.contains("generator"),
+        "{message}"
+    );
+    fs::remove_dir_all(root).unwrap();
 }
 
 fn reject_asset_path_traversal(root: &std::path::Path, valid_manifest: &std::path::Path) {
@@ -108,10 +180,13 @@ fn sorted_file_names(dir: &std::path::Path) -> Vec<String> {
     names
 }
 
-fn unique_temp() -> PathBuf {
+fn unique_temp(suffix: &str) -> PathBuf {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    env::temp_dir().join(format!("zed-ores-stack-determinism-{}-{now}", process::id()))
+    env::temp_dir().join(format!(
+        "zed-ores-stack-{suffix}-{}-{now}",
+        process::id()
+    ))
 }
