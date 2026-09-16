@@ -1,0 +1,43 @@
+name: ores-stack determinism
+
+on:
+  push:
+    branches:
+      - test/ores-stack-determinism
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zed-pkg-test-ores-stack-determinism
+  cancel-in-progress: true
+
+jobs:
+  determinism:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out Zed test consumer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          show-progress: false
+
+      - name: Check out api-docs page-build authority
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ORESoftware/api-docs
+          ref: DEN-3960-rust-fs-routing
+          path: deps/api-docs
+          persist-credentials: false
+          show-progress: false
+
+      - name: Install Rust 1.88.0
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: 1.88.0
+
+      - name: Run deterministic page-plan consumer
+        run: cargo run --manifest-path certification/ores-stack-determinism/Cargo.toml
