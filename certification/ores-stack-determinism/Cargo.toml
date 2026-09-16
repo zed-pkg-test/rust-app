@@ -1,0 +1,8 @@
+[package]
+name = "ores-stack-determinism-smoke"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+ores-api-docs = { path = "../../deps/api-docs/rust" }
