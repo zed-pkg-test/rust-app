@@ -1,0 +1,27 @@
+name: beamscale-cli-format-verify
+
+on:
+  push:
+    branches:
+      - beamscale-cli-rustfmt-proof-20260925
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path beamscale-proof/Cargo.toml --all -- --check
+      - name: Check all targets
+        run: cargo check --manifest-path beamscale-proof/Cargo.toml --all-targets
+      - name: Run tests
+        run: cargo test --manifest-path beamscale-proof/Cargo.toml
