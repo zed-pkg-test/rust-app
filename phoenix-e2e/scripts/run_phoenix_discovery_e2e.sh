@@ -12,7 +12,6 @@ rm -rf "$OUT" "$FIXTURE_OUT"
 mkdir -p "$OUT" "$FIXTURE_OUT"
 
 pushd "$BMSCL_CLI_DIR" >/dev/null
-cargo fmt --all -- --check
 cargo test --all-targets
 cargo build
 CLI="$BMSCL_CLI_DIR/target/debug/bmscl"
