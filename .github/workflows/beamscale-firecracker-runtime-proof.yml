@@ -1,0 +1,23 @@
+name: beamscale-firecracker-runtime-proof
+
+on:
+  push:
+    branches:
+      - beamscale-firecracker-runtime-proof-20260925
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check runtime-host library
+        run: cargo check --manifest-path beamscale-runtime-host-proof/Cargo.toml --lib
+      - name: Test runtime-host library
+        run: cargo test --manifest-path beamscale-runtime-host-proof/Cargo.toml --lib
