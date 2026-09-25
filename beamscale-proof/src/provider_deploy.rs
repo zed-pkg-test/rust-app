@@ -157,9 +157,8 @@ fn deploy_gcp(options: ExternalDeployOptions) -> Result<()> {
     validate_gcp_service(service)?;
     validate_gcp_project(project)?;
     let (left, right) = options.bundle_sha256.split_at(32);
-    let labels = format!(
-        "bmscl-bundle-a={left},bmscl-bundle-b={right},bmscl-provider=gcp-cloud-run"
-    );
+    let labels =
+        format!("bmscl-bundle-a={left},bmscl-bundle-b={right},bmscl-provider=gcp-cloud-run");
     let argv = vec![
         "gcloud".to_owned(),
         "run".to_owned(),
@@ -268,9 +267,7 @@ fn validate_gcp_project(value: &str) -> Result<()> {
 fn valid_arn(value: &str) -> bool {
     value.starts_with("arn:")
         && !value.is_empty()
-        && !value
-            .bytes()
-            .any(|byte| matches!(byte, b'\r' | b'\n' | 0))
+        && !value.bytes().any(|byte| matches!(byte, b'\r' | b'\n' | 0))
 }
 
 fn run(argv: &[String], what: &str) -> Result<()> {
@@ -337,16 +334,19 @@ mod tests {
             Provider::parse("aws-lambda-managed").unwrap(),
             Provider::AwsLambdaManaged
         );
-        assert_eq!(Provider::parse("gcp-cloud-run").unwrap(), Provider::GcpCloudRun);
+        assert_eq!(
+            Provider::parse("gcp-cloud-run").unwrap(),
+            Provider::GcpCloudRun
+        );
         assert!(Provider::parse("other").is_err());
     }
 
     #[test]
     fn provider_images_must_be_digest_pinned() {
-        assert!(validate_immutable_image(
-            &format!("registry.example/x@sha256:{}", "a".repeat(64))
-        )
-        .is_ok());
+        assert!(
+            validate_immutable_image(&format!("registry.example/x@sha256:{}", "a".repeat(64)))
+                .is_ok()
+        );
         assert!(validate_immutable_image("registry.example/x:latest").is_err());
         assert!(validate_immutable_image("x\nRUN evil").is_err());
     }
