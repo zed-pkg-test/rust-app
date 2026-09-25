@@ -19,4 +19,4 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Test exact BeamScale runtime-control modules
         working-directory: beamscale-runtime-control-proof
-        run: cargo test --all-targets --locked
+        run: cargo test --all-targets
