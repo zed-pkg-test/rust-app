@@ -1094,8 +1094,6 @@ struct RuntimePaths {
     vsock_path: PathBuf,
     snapshot_state: PathBuf,
     snapshot_mem: PathBuf,
-    netns_name: String,
-    netns_path: PathBuf,
 }
 
 impl RuntimePaths {
@@ -1285,6 +1283,8 @@ struct JailedRuntime {
     rootfs: PathBuf,
     snapshot_state: PathBuf,
     snapshot_mem: PathBuf,
+    netns_name: String,
+    netns_path: PathBuf,
 }
 
 impl JailedRuntime {
