@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "beamscale.firecracker-runtime.v1",
+  "hostApi": {
+    "ensure": "POST /v1/shards/ensure",
+    "start": "POST /v1/shards/start",
+    "activate": "POST /v1/shards/activate",
+    "invoke": "POST /v1/shards/invoke",
+    "status": "GET /v1/shards/{execution_class}/{tenant_id}/{shard_id}",
+    "touch": "POST /v1/shards/touch",
+    "warmIdle": "POST /v1/shards/warm-idle",
+    "hibernate": "POST /v1/shards/hibernate",
+    "terminate": "POST /v1/shards/terminate"
+  },
+  "acceptedExecutionClasses": [
+    "phoenix",
+    "durable_actor"
+  ],
+  "requiredBackend": "firecracker",
+  "tenantIsolation": "single_tenant_microvm",
+  "guest": {
+    "transport": "vsock",
+    "rootFilesystem": "read_only",
+    "writableTmpfs": {
+      "enabled": true,
+      "maxMiB": 256
+    },
+    "persistentStorage": "capability_only",
+    "network": "capability_only",
+    "metadataService": "denied",
+    "hostLoopback": "denied",
+    "privateNetwork": "denied_by_default",
+    "osProcessSpawn": "denied_by_default",
+    "nativeCode": "denied_by_default"
+  },
+  "lifecycle": [
+    "cold",
+    "starting",
+    "hot",
+    "warm_idle",
+    "hibernated",
+    "draining",
+    "terminated"
+  ],
+  "fencing": {
+    "runtimeEpochRequired": true,
+    "staleEpochMutation": "reject",
+    "activationAckBindsDeploymentDigest": true
+  },
+  "evidence": [
+    "tenant_id",
+    "execution_class",
+    "execution_backend",
+    "runtime_epoch",
+    "deployment_digest",
+    "host_id",
+    "region",
+    "kernel_digest",
+    "rootfs_digest",
+    "firecracker_digest",
+    "jailer_policy_digest"
+  ],
+  "hostIsolation": {
+    "launcher": "jailer",
+    "jailerRequired": true,
+    "newPidNamespace": true,
+    "cgroupVersion": 2,
+    "seccomp": "firecracker_default",
+    "jailPerRuntimeEpoch": true
+  },
+  "controlAuthentication": {
+    "required": true,
+    "scheme": "hmac-sha256",
+    "contractVersion": "bmscl.runtime-control.v1",
+    "exactRequestSha256": true,
+    "maxTtlSeconds": 60,
+    "nonceReplay": "reject_once_consumed",
+    "secretScope": "control_plane_and_runtime_host_only",
+    "tenantGuestAccess": "denied"
+  }
+}
