@@ -74,6 +74,24 @@ struct ManifestSummary {
     runtime: String,
     language: String,
     profile: String,
+    #[serde(default)]
+    artifact_format: Option<String>,
+    #[serde(default)]
+    artifact_root: Option<String>,
+    #[serde(default)]
+    execution_class: Option<String>,
+    #[serde(default)]
+    isolation_class: Option<String>,
+    #[serde(default)]
+    app: Option<String>,
+    #[serde(default)]
+    version: Option<String>,
+    #[serde(default)]
+    router: Option<String>,
+    #[serde(default)]
+    endpoint: Option<String>,
+    #[serde(default)]
+    route_plan_sha256: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -91,6 +109,24 @@ struct DeploymentRecord {
     runtime: String,
     language: String,
     profile: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    artifact_format: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    artifact_root: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    execution_class: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    isolation_class: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    app: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    router: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    endpoint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    route_plan_sha256: Option<String>,
     key_id: String,
     archive_sha256: String,
     archive_name: String,
@@ -604,6 +640,15 @@ async fn upload_deployment(
         runtime: manifest.runtime,
         language: manifest.language,
         profile: manifest.profile,
+        artifact_format: manifest.artifact_format,
+        artifact_root: manifest.artifact_root,
+        execution_class: manifest.execution_class,
+        isolation_class: manifest.isolation_class,
+        app: manifest.app,
+        version: manifest.version,
+        router: manifest.router,
+        endpoint: manifest.endpoint,
+        route_plan_sha256: manifest.route_plan_sha256,
         key_id: attestation.key_id,
         archive_sha256,
         archive_name,
@@ -1141,6 +1186,15 @@ mod tests {
             runtime: "beam".into(),
             language: "gleam".into(),
             profile: "bmscl-hosted-gleam-v1".into(),
+            artifact_format: None,
+            artifact_root: None,
+            execution_class: None,
+            isolation_class: None,
+            app: None,
+            version: None,
+            router: None,
+            endpoint: None,
+            route_plan_sha256: None,
             key_id: "test-key".into(),
             archive_sha256: "f".repeat(64),
             archive_name: "worker.zip".into(),
