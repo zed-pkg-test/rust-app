@@ -19,6 +19,7 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
+#[allow(clippy::large_enum_variant)]
 enum Commands {
     /// Deploy a tenant-dedicated Durable Object / critical-section worker.
     DurableObjects {
