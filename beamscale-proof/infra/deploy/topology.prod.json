@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "beamscale.deploy-topology.v1",
+  "platform": "beamscale",
+  "environment": "prod",
+  "kubernetes": {
+    "enabled": true,
+    "clusters": [
+      {
+        "id": "bmscl-prod-region-a",
+        "provider": "aws",
+        "region": "us-east-1",
+        "controlPlaneNodes": 3,
+        "podCidr": "10.40.0.0/16",
+        "serviceCidr": "10.140.0.0/16"
+      },
+      {
+        "id": "bmscl-prod-region-b",
+        "provider": "aws",
+        "region": "us-west-2",
+        "controlPlaneNodes": 3,
+        "podCidr": "10.41.0.0/16",
+        "serviceCidr": "10.141.0.0/16"
+      }
+    ]
+  },
+  "bareProcess": {
+    "enabled": true,
+    "hostCount": 6,
+    "regions": [
+      "us-east-1",
+      "us-west-2"
+    ],
+    "hostConfiguration": "nixos",
+    "deployer": "colmena",
+    "sandbox": "ores-proc-isolation-cli",
+    "policy": "deploy/baremetal/.ores-proc-isolation.yaml"
+  },
+  "firecracker": {
+    "enabled": true,
+    "poolId": "bmscl-prod-firecracker",
+    "hostCount": 6,
+    "regions": [
+      "us-east-1",
+      "us-west-2"
+    ],
+    "hostConfiguration": "nixos",
+    "deployer": "colmena",
+    "hypervisor": "firecracker",
+    "jailerRequired": true,
+    "kvmRequired": true,
+    "tenantIsolation": "single_tenant_microvm",
+    "executionClasses": [
+      "phoenix",
+      "durable_actor"
+    ],
+    "guestTransport": "vsock",
+    "rootFilesystem": "read_only",
+    "writableTmpfsMiB": 256,
+    "osProcessSpawnDefault": "deny",
+    "nativeCodeDefault": "deny",
+    "contract": "deploy/firecracker/runtime-host-contract.json",
+    "signedControlPlaneRequired": true,
+    "controlContractVersion": "bmscl.runtime-control.v1",
+    "nonceReplayProtection": true,
+    "jailerChrootBase": "/srv/jailer",
+    "jailerUid": 65534,
+    "jailerGid": 65534
+  }
+}
