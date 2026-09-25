@@ -1,0 +1,21 @@
+schema_version = 1
+tenant_id = "acme"
+namespace = "critical-sections"
+language = "erlang"
+tenancy_class = "tenant_dedicated"
+
+[build]
+project = "./critical-worker"
+out_dir = "dist-critical"
+policy = "bmscl-policy.toml"
+# worker_config = ".ores-lambda.toml"
+
+[artifact]
+# Optional for locally built artifacts: deploy derives and validates the digest
+# from dist-critical/manifest.json. Set build_sha256 for digest-only deployment
+# or to pin an expected local build exactly.
+directory = "dist-critical"
+# build_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+[deployment]
+id = "orders-critical-sections"
