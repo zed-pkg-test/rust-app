@@ -1,0 +1,25 @@
+name: beamscale-firecracker-runtime-proof
+
+on:
+  push:
+    branches:
+      - beamscale-firecracker-netns-proof-20260925
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check runtime host
+        working-directory: beamscale-proof/runtime-host
+        run: cargo check --all-targets
+      - name: Test runtime host
+        working-directory: beamscale-proof/runtime-host
+        run: cargo test --lib
