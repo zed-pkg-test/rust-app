@@ -135,7 +135,14 @@ fn extract_tar_gz(bytes: &[u8], destination: &Path, limits: ArchiveLimits) -> Re
             continue;
         }
         if !kind.is_file() {
-            bail!("tar bundle may contain regular files and the beam directory only");
+            bail!("tar bundle may contain regular files and directories only");
+        }
+        let mode = entry.header().mode().context("read tar entry mode")?;
+        if mode & 0o6000 != 0 {
+            bail!(
+                "tar bundle file {} contains setuid/setgid permission bits",
+                path.display()
+            );
         }
 
         validate_artifact_path(&path)?;
@@ -189,6 +196,9 @@ fn validate_zip_mode(mode: Option<u32>, is_dir: bool) -> Result<()> {
     let expected = if is_dir { 0o040000 } else { 0o100000 };
     if file_type != 0 && file_type != expected {
         bail!("ZIP bundle contains a symlink or special-mode entry");
+    }
+    if mode & 0o6000 != 0 {
+        bail!("ZIP bundle contains setuid/setgid permission bits");
     }
     Ok(())
 }
@@ -548,7 +558,44 @@ mod tests {
     fn zip_special_modes_are_rejected() {
         assert!(validate_zip_mode(Some(0o120777), false).is_err());
         assert!(validate_zip_mode(Some(0o060600), false).is_err());
-        assert!(validate_zip_mode(Some(0o100644), false).is_ok());
+        assert!(validate_zip_mode(Some(0o104755), false).is_err());
+        assert!(validate_zip_mode(Some(0o102755), false).is_err());
+        assert!(validate_zip_mode(Some(0o100755), false).is_ok());
         assert!(validate_zip_mode(Some(0o040755), true).is_ok());
+    }
+
+    #[test]
+    fn tar_setuid_release_file_is_rejected() {
+        let dir = tempdir().unwrap();
+        let encoder = GzEncoder::new(Vec::new(), Compression::default());
+        let mut tar = TarBuilder::new(encoder);
+        for (name, bytes) in [
+            ("manifest.json", b"{}".as_slice()),
+            ("admission-report.json", b"{}".as_slice()),
+            ("provenance.json", b"{}".as_slice()),
+            ("attestation.json", b"{}".as_slice()),
+            ("route-plan.json", b"{}".as_slice()),
+            ("release/releases/0.1.0/start.boot", b"boot".as_slice()),
+        ] {
+            append_tar_file(&mut tar, name, bytes);
+        }
+        let mut header = Header::new_gnu();
+        let bytes = b"#!/bin/sh";
+        header.set_size(bytes.len() as u64);
+        header.set_mode(0o4755);
+        header.set_cksum();
+        tar.append_data(&mut header, "release/bin/demo", Cursor::new(bytes))
+            .unwrap();
+        let archive = tar.into_inner().unwrap().finish().unwrap();
+
+        let error = extract_artifact(
+            "phoenix-release.tar.gz",
+            &archive,
+            dir.path(),
+            ArchiveLimits::for_upload_ceiling(1024 * 1024),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("setuid/setgid"));
     }
 }
