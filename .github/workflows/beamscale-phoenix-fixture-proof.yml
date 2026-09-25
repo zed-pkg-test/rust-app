@@ -1,0 +1,35 @@
+name: beamscale-phoenix-fixture-proof
+
+on:
+  push:
+    branches:
+      - beamscale-phoenix-fixture-proof-20260925
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124
+        with:
+          otp-version: "27.3"
+          elixir-version: "1.18.4"
+          version-type: strict
+      - name: Install Hex and Rebar
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+      - name: Run Phoenix discovery E2E
+        working-directory: phoenix-e2e
+        env:
+          BMSCL_CLI_DIR: ${{ github.workspace }}/beamscale-proof
+        run: bash scripts/run_phoenix_discovery_e2e.sh
