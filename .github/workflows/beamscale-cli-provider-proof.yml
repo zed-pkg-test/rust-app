@@ -1,9 +1,9 @@
-name: beamscale-cli-provider-proof
+name: beamscale-cli-phoenix-proof
 
 on:
   push:
     branches:
-      - beamscale-cli-provider-proof-20260925
+      - beamscale-cli-phoenix-proof-20260925
 
 permissions:
   contents: read
