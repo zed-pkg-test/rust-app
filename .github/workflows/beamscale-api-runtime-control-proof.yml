@@ -1,0 +1,25 @@
+name: beamscale-api-runtime-control-proof
+
+on:
+  push:
+    branches:
+      - beamscale-api-runtime-control-proof-20260925
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check API server
+        working-directory: beamscale-proof/api-server
+        run: cargo check --all-targets
+      - name: Test API server
+        working-directory: beamscale-proof/api-server
+        run: cargo test
