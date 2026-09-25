@@ -1,2 +1,3 @@
 trigger rustfmt + durable proof
 retry with formatter credentials
+retry with rebase-safe formatter
