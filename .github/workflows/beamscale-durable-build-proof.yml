@@ -1,0 +1,62 @@
+name: beamscale-durable-build-proof
+
+on:
+  push:
+    branches:
+      - beamscale-durable-build-proof-20260925
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124
+        with:
+          otp-version: "27.3"
+          gleam-version: "1.12.0"
+          rebar3-version: "3.24.0"
+          version-type: strict
+      - name: Check compiler PR head
+        run: |
+          cargo fmt --manifest-path compiler-proof/Cargo.toml --all -- --check
+          cargo clippy --manifest-path compiler-proof/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path compiler-proof/Cargo.toml --all-targets
+      - name: Package constrained Erlang worker
+        env:
+          BMSCL_BUILDER_ID: funded-proof
+          BMSCL_BUILDER_IMAGE_DIGEST: sha256:1111111111111111111111111111111111111111111111111111111111111111
+          BMSCL_COMPILER_REVISION: "751d62ddab5879002660511226d20d77bdfb918b"
+        run: |
+          cargo run --manifest-path compiler-proof/Cargo.toml -- package-erlang-critical             compiler-proof/fixtures/critical_erlang             --policy compiler-proof/bmscl-policy.toml             --out-dir compiler-proof/target/proof-erlang
+          test -f compiler-proof/target/proof-erlang/beam/worker.beam
+          test -f compiler-proof/target/proof-erlang/worker.tar.gz
+          grep -q '"language": "erlang"' compiler-proof/target/proof-erlang/manifest.json
+          grep -q '"profile": "bmscl-critical-section-erlang-v1"' compiler-proof/target/proof-erlang/manifest.json
+      - name: Check CLI PR head
+        run: |
+          cargo fmt --manifest-path cli-proof/Cargo.toml --all -- --check
+          cargo clippy --manifest-path cli-proof/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path cli-proof/Cargo.toml --all-targets
+      - name: Prove config-driven Durable Object build
+        env:
+          BMSCL_COMPILER: ${{ github.workspace }}/compiler-proof/target/debug/bmscl-compiler
+          BMSCL_BUILDER_ID: funded-proof
+          BMSCL_BUILDER_IMAGE_DIGEST: sha256:1111111111111111111111111111111111111111111111111111111111111111
+          BMSCL_COMPILER_REVISION: "751d62ddab5879002660511226d20d77bdfb918b"
+        run: |
+          cargo build --manifest-path cli-proof/Cargo.toml
+          cli-proof/target/debug/bmscl durable-objects build             --config cli-proof/.bmscl-durable-objects.toml             --unsigned
+          test -f cli-proof/dist-critical/manifest.json
+          test -f cli-proof/dist-critical/worker.tar.gz
+          grep -q '"language": "erlang"' cli-proof/dist-critical/manifest.json
+          grep -q '"profile": "bmscl-critical-section-erlang-v1"' cli-proof/dist-critical/manifest.json
+          cli-proof/target/debug/bmscl durable-objects deploy             --config cli-proof/.bmscl-durable-objects.toml             --dry-run
