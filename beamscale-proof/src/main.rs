@@ -4,6 +4,7 @@ mod docs_manifest;
 mod durable_objects;
 mod provider_bundle;
 mod provider_deploy;
+mod phoenix;
 mod workspace;
 
 use anyhow::{bail, Context, Result};
@@ -120,6 +121,23 @@ enum Commands {
         public_key: Option<String>,
         #[arg(long)]
         key_id: Option<String>,
+    },
+    /// Inspect a Phoenix router and optional Endpoint socket table, then emit a deterministic Firecracker route plan.
+    PhoenixPlan {
+        #[arg(default_value = ".")]
+        project: PathBuf,
+        /// Fully-qualified Phoenix router module, for example MyAppWeb.Router.
+        #[arg(long)]
+        router: String,
+        /// Optional Phoenix Endpoint module. When supplied, BeamScale inspects __sockets__/0 and discovers websocket paths.
+        #[arg(long)]
+        endpoint: Option<String>,
+        /// Additional WebSocket endpoint path. Repeat for explicit/fallback entries.
+        #[arg(long = "socket-path")]
+        socket_paths: Vec<String>,
+        /// Output file. Omit to write JSON to stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
     /// Verify selected compiler artifacts locally using the canonical compiler verifier.
     Verify {
@@ -337,6 +355,19 @@ fn main() -> Result<()> {
             })?;
             Ok(())
         }
+        Commands::PhoenixPlan {
+            project,
+            router,
+            endpoint,
+            socket_paths,
+            output,
+        } => phoenix::emit(phoenix::PhoenixPlanOptions {
+            project,
+            router,
+            endpoint,
+            socket_paths,
+            output,
+        }),
         Commands::Verify {
             artifact_dir,
             lambdas,
