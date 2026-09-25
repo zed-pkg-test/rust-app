@@ -1,7 +1,4 @@
-use crate::{
-    attestation::sign_artifact,
-    build::digest_tree,
-};
+use crate::{attestation::sign_artifact, build::digest_tree};
 use anyhow::{bail, Context, Result};
 use flate2::{Compression, GzBuilder};
 use serde::{Deserialize, Serialize};
@@ -98,11 +95,7 @@ pub fn admit_release(options: PhoenixReleaseOptions) -> Result<()> {
         MAX_ROUTE_PLAN_BYTES,
         "Phoenix route plan",
     )?;
-    let route_plan = validate_route_plan(
-        &route_plan_bytes,
-        &options.router,
-        &options.endpoint,
-    )?;
+    let route_plan = validate_route_plan(&route_plan_bytes, &options.router, &options.endpoint)?;
     let route_plan_sha256 = sha256_hex(&route_plan_bytes);
     debug_assert_eq!(route_plan.schema_version, PHOENIX_DISCOVERY_V2);
     match (&options.signing_key, &options.key_id) {
@@ -249,7 +242,11 @@ pub fn verify_release_artifact_dir(artifact_dir: &Path) -> Result<()> {
         bail!("Phoenix route plan digest does not match manifest");
     }
     validate_route_plan(&route_plan_bytes, &manifest.router, &manifest.endpoint)?;
-    verify_release_layout(&artifact_dir.join("release"), &manifest.app, &manifest.version)?;
+    verify_release_layout(
+        &artifact_dir.join("release"),
+        &manifest.app,
+        &manifest.version,
+    )?;
     let actual = digest_tree(&artifact_dir.join("release"))?;
     if actual != manifest.build_sha256 {
         bail!("Phoenix release tree digest does not match manifest");
@@ -347,10 +344,7 @@ fn verify_release_layout(root: &Path, app: &str, version: &str) -> Result<()> {
 
     let bin = root.join("bin").join(app);
     require_regular_file(&bin)?;
-    let boot = root
-        .join("releases")
-        .join(version)
-        .join("start.boot");
+    let boot = root.join("releases").join(version).join("start.boot");
     require_regular_file(&boot)?;
 
     let mut total = 0u64;
@@ -359,7 +353,10 @@ fn verify_release_layout(root: &Path, app: &str, version: &str) -> Result<()> {
         let path = entry.path();
         let meta = fs::symlink_metadata(path)?;
         if meta.file_type().is_symlink() {
-            bail!("symlinks are forbidden in Phoenix releases: {}", path.display());
+            bail!(
+                "symlinks are forbidden in Phoenix releases: {}",
+                path.display()
+            );
         }
         if meta.is_file() {
             total = total
@@ -373,11 +370,17 @@ fn verify_release_layout(root: &Path, app: &str, version: &str) -> Result<()> {
                 use std::os::unix::fs::PermissionsExt;
                 let mode = meta.permissions().mode();
                 if mode & 0o6000 != 0 {
-                    bail!("setuid/setgid file forbidden in Phoenix release: {}", path.display());
+                    bail!(
+                        "setuid/setgid file forbidden in Phoenix release: {}",
+                        path.display()
+                    );
                 }
             }
         } else if !meta.is_dir() {
-            bail!("special files are forbidden in Phoenix releases: {}", path.display());
+            bail!(
+                "special files are forbidden in Phoenix releases: {}",
+                path.display()
+            );
         }
     }
     Ok(())
@@ -397,15 +400,19 @@ fn copy_release_tree(source: &Path, destination: &Path) -> Result<()> {
             continue;
         }
         let relative = path.strip_prefix(source)?;
-        if relative.components().any(|part| {
-            !matches!(part, Component::Normal(_))
-        }) {
+        if relative
+            .components()
+            .any(|part| !matches!(part, Component::Normal(_)))
+        {
             bail!("invalid Phoenix release path {}", relative.display());
         }
         let target = destination.join(relative);
         let meta = fs::symlink_metadata(path)?;
         if meta.file_type().is_symlink() {
-            bail!("symlinks are forbidden in Phoenix releases: {}", path.display());
+            bail!(
+                "symlinks are forbidden in Phoenix releases: {}",
+                path.display()
+            );
         } else if meta.is_dir() {
             fs::create_dir_all(&target)?;
         } else if meta.is_file() {
@@ -415,7 +422,10 @@ fn copy_release_tree(source: &Path, destination: &Path) -> Result<()> {
             fs::copy(path, &target)?;
             fs::set_permissions(&target, meta.permissions())?;
         } else {
-            bail!("special files are forbidden in Phoenix releases: {}", path.display());
+            bail!(
+                "special files are forbidden in Phoenix releases: {}",
+                path.display()
+            );
         }
     }
     Ok(())
@@ -449,7 +459,10 @@ fn require_regular_file(path: &Path) -> Result<()> {
     let meta = fs::symlink_metadata(path)
         .with_context(|| format!("required Phoenix release file missing: {}", path.display()))?;
     if meta.file_type().is_symlink() || !meta.is_file() {
-        bail!("required Phoenix release path is not a regular file: {}", path.display());
+        bail!(
+            "required Phoenix release path is not a regular file: {}",
+            path.display()
+        );
     }
     Ok(())
 }
@@ -567,8 +580,7 @@ mod tests {
           "routes": [],
           "connections": []
         }"#;
-        let plan =
-            validate_route_plan(bytes, "DemoWeb.Router", "DemoWeb.Endpoint").unwrap();
+        let plan = validate_route_plan(bytes, "DemoWeb.Router", "DemoWeb.Endpoint").unwrap();
         assert_eq!(plan.schema_version, PHOENIX_DISCOVERY_V2);
         assert!(validate_route_plan(bytes, "Other.Router", "DemoWeb.Endpoint").is_err());
 
@@ -581,9 +593,7 @@ mod tests {
             wrong_isolation..wrong_isolation + b"firecracker".len(),
             b"bareprocess".iter().copied(),
         );
-        assert!(
-            validate_route_plan(&tampered, "DemoWeb.Router", "DemoWeb.Endpoint").is_err()
-        );
+        assert!(validate_route_plan(&tampered, "DemoWeb.Router", "DemoWeb.Endpoint").is_err());
     }
 
     #[test]

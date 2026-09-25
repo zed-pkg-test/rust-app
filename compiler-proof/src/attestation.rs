@@ -465,8 +465,7 @@ mod tests {
         fs::write(dir.path().join("release/bin/app"), b"release-v1").unwrap();
         let build = digest_tree(&dir.path().join("release")).unwrap();
         let source = "33".repeat(32);
-        let provenance =
-            format!("{{\"source_sha256\":\"{source}\",\"build_sha256\":\"{build}\"}}");
+        let provenance = format!("{{\"source_sha256\":\"{source}\",\"build_sha256\":\"{build}\"}}");
         let provenance_sha = sha256_hex(provenance.as_bytes());
         fs::write(
             dir.path().join("manifest.json"),
@@ -475,7 +474,11 @@ mod tests {
             ),
         )
         .unwrap();
-        fs::write(dir.path().join("admission-report.json"), b"{\"admitted\":true}").unwrap();
+        fs::write(
+            dir.path().join("admission-report.json"),
+            b"{\"admitted\":true}",
+        )
+        .unwrap();
         fs::write(dir.path().join("provenance.json"), provenance).unwrap();
         let (key_path, _) = test_key(dir.path());
         sign_artifact(dir.path(), "release-key", &key_path).unwrap();

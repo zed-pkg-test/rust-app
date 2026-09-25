@@ -1,8 +1,8 @@
 use crate::{
     build::digest_tree,
     model::{
-        AdmissionReport, ArtifactManifest, BuildProvenance, Policy, PROVENANCE_FORMAT_V1,
-        ERLANG_CRITICAL_SECTION_PROFILE_V1,
+        AdmissionReport, ArtifactManifest, BuildProvenance, Policy,
+        ERLANG_CRITICAL_SECTION_PROFILE_V1, PROVENANCE_FORMAT_V1,
     },
     policy::{capability_grants, check_worker_config, effective_limits, load_worker_config},
 };
@@ -10,8 +10,7 @@ use anyhow::{bail, Context, Result};
 use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeMap,
-    env,
-    fs,
+    env, fs,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -44,12 +43,7 @@ pub fn build_erlang_critical_section(
     }
 
     let mut config_findings = Vec::new();
-    check_worker_config(
-        &worker_config,
-        &config_path,
-        &policy,
-        &mut config_findings,
-    );
+    check_worker_config(&worker_config, &config_path, &policy, &mut config_findings);
     if !config_findings.is_empty() {
         let messages = config_findings
             .iter()
@@ -150,7 +144,10 @@ fn validate_sources(sources: &[PathBuf], policy: &Policy) -> Result<()> {
             bail!("{}: include directives are forbidden in v1", path.display());
         }
         if source.contains("-on_load(") || source.contains("-nifs(") {
-            bail!("{}: load-time or native hooks are forbidden", path.display());
+            bail!(
+                "{}: load-time or native hooks are forbidden",
+                path.display()
+            );
         }
         for pattern in &policy.forbidden_erlang_patterns {
             if source.contains(pattern) {
@@ -328,7 +325,12 @@ mod tests {
             ..crate::model::WorkerConfig::default()
         };
         let mut findings = Vec::new();
-        check_worker_config(&config, Path::new(".ores-lambda.toml"), &policy, &mut findings);
+        check_worker_config(
+            &config,
+            Path::new(".ores-lambda.toml"),
+            &policy,
+            &mut findings,
+        );
         assert!(findings
             .iter()
             .any(|finding| finding.code == "BMSCL_RUNTIME_LIMIT_OUT_OF_POLICY"));
@@ -339,8 +341,11 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         fs::create_dir_all(temp.path().join("src")).unwrap();
         let worker = temp.path().join("src/worker.erl");
-        fs::write(&worker, "-module(worker).\n-export([handle/2]).\nhandle(R,C)->{R,C}.\n")
-            .unwrap();
+        fs::write(
+            &worker,
+            "-module(worker).\n-export([handle/2]).\nhandle(R,C)->{R,C}.\n",
+        )
+        .unwrap();
         let first = digest_sources(temp.path(), std::slice::from_ref(&worker)).unwrap();
         let second = digest_sources(temp.path(), &[worker]).unwrap();
         assert_eq!(first, second);

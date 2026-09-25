@@ -7,8 +7,8 @@ mod build;
 mod erlang;
 mod host_bridge_verify;
 mod model;
-mod policy;
 mod phoenix_release;
+mod policy;
 mod process_dict_verify;
 mod trusted_sdk;
 
@@ -27,11 +27,11 @@ use beam_verify::verify_final_beam;
 use build::{build_project, package_project};
 use erlang::build_erlang_critical_section;
 use host_bridge_verify::verify_trusted_host_bridges;
-use policy::load_policy;
 use phoenix_release::{
     admit_release, artifact_root_from_dir, package_release, verify_release_artifact_dir,
     PhoenixReleaseOptions,
 };
+use policy::load_policy;
 use process_dict_verify::verify_no_process_dictionary_access;
 
 #[derive(Parser, Debug)]
@@ -278,12 +278,7 @@ fn main() -> Result<()> {
             out_dir,
         } => {
             let policy = load_policy(policy.as_deref())?;
-            build_erlang_critical_section(
-                &project,
-                &out_dir,
-                &policy,
-                worker_config.as_deref(),
-            )?;
+            build_erlang_critical_section(&project, &out_dir, &policy, worker_config.as_deref())?;
             verify_deployable_beam(&out_dir.join("beam"))?;
         }
         Commands::PackageErlangCritical {
@@ -295,16 +290,9 @@ fn main() -> Result<()> {
             key_id,
         } => {
             let policy = load_policy(policy.as_deref())?;
-            build_erlang_critical_section(
-                &project,
-                &out_dir,
-                &policy,
-                worker_config.as_deref(),
-            )?;
+            build_erlang_critical_section(&project, &out_dir, &policy, worker_config.as_deref())?;
             verify_deployable_beam(&out_dir.join("beam"))?;
-            if let (Some(signing_key), Some(key_id)) =
-                (signing_key.as_deref(), key_id.as_deref())
-            {
+            if let (Some(signing_key), Some(key_id)) = (signing_key.as_deref(), key_id.as_deref()) {
                 sign_artifact(&out_dir, key_id, signing_key)?;
             }
             package_project(&out_dir)?;
