@@ -88,6 +88,41 @@ struct InvokeRequest {
     timeout_ms: u64,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum CriticalSectionOperation {
+    Acquire,
+    Renew,
+    Release,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+struct CriticalSectionToken {
+    runtime_epoch: u64,
+    owner_epoch: u64,
+    sequence: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct CriticalSectionRequest {
+    tenant_id: String,
+    shard_id: String,
+    execution_class: ExecutionClass,
+    execution_backend: ExecutionBackend,
+    runtime_epoch: u64,
+    deployment_id: String,
+    operation: CriticalSectionOperation,
+    namespace: String,
+    object_key: String,
+    holder: String,
+    #[serde(default)]
+    lease_ms: Option<u64>,
+    #[serde(default)]
+    token: Option<CriticalSectionToken>,
+    #[serde(default = "default_critical_section_timeout_ms")]
+    timeout_ms: u64,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 struct ActivateRequest {
     tenant_id: String,
@@ -139,6 +174,7 @@ impl_runtime_request_identity!(EpochRequest);
 impl_runtime_request_identity!(TouchRequest);
 impl_runtime_request_identity!(ActivateRequest);
 impl_runtime_request_identity!(InvokeRequest);
+impl_runtime_request_identity!(CriticalSectionRequest);
 
 #[derive(Debug, Serialize)]
 struct ActivationStatus {
@@ -218,6 +254,7 @@ async fn main() {
         .route("/v1/shards/activate", post(activate))
         .route("/v1/shards/touch", post(touch))
         .route("/v1/shards/invoke", post(invoke))
+        .route("/v1/shards/critical-section", post(critical_section))
         .route("/v1/shards/warm-idle", post(warm_idle))
         .route("/v1/shards/hibernate", post(hibernate))
         .route("/v1/shards/terminate", post(terminate))
@@ -466,6 +503,150 @@ async fn touch(
     state.host.touch(req).await.map(Json).map_err(map_err)
 }
 
+async fn critical_section(
+    State(state): State<AppState>,
+    Json(signed): Json<SignedRequest<CriticalSectionRequest>>,
+) -> Result<impl IntoResponse, ApiError> {
+    let SignedRequest { contract, request: req } = signed;
+    authorize_runtime_request(&state, "critical-section", &req, &contract).await?;
+    validate_shard_identity(&req.tenant_id, &req.shard_id)?;
+    validate_firecracker_target(req.execution_class, req.execution_backend)?;
+    if req.execution_class != ExecutionClass::DurableActor {
+        return Err(api_error(
+            StatusCode::BAD_REQUEST,
+            "critical-section operations require execution_class=durable_actor",
+        ));
+    }
+    validate_critical_section_request(&req)?;
+    let deployment_id = normalize_build_digest(&req.deployment_id)
+        .map_err(|message| api_error(StatusCode::BAD_REQUEST, message))?;
+    let envelope = critical_section_envelope(&req);
+    let request_bytes = serde_json::to_vec(&envelope)
+        .map_err(|err| api_error(StatusCode::BAD_REQUEST, err.to_string()))?;
+    if request_bytes.len() > state.guest_max_frame_bytes {
+        return Err(api_error(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "critical-section frame too large",
+        ));
+    }
+
+    let (backend, vsock_path) = {
+        let _barrier = state.lifecycle_barrier.read().await;
+        let gate_index =
+            shard_gate_index(req.execution_class, &req.tenant_id, &req.shard_id);
+        let _gate = state.shard_gates[gate_index].lock().await;
+        let shard = state
+            .host
+            .get(req.execution_class, &req.tenant_id, &req.shard_id)
+            .await
+            .map_err(map_err)?;
+        check_runtime_epoch(&shard, req.runtime_epoch)?;
+        check_execution_target(&shard, req.execution_class, req.execution_backend)?;
+        if !matches!(shard.state, LifecycleState::Hot | LifecycleState::WarmIdle) {
+            return Err(api_error(
+                StatusCode::CONFLICT,
+                format!("shard is not runnable: {:?}", shard.state),
+            ));
+        }
+        if !deployment_allowed(&state, &shard, &deployment_id).await? {
+            return Err(api_error(
+                StatusCode::CONFLICT,
+                "critical-section deployment digest is not loaded for this shard epoch",
+            ));
+        }
+        state
+            .host
+            .touch(TouchRequest {
+                tenant_id: req.tenant_id.clone(),
+                shard_id: req.shard_id.clone(),
+                execution_class: req.execution_class,
+                execution_backend: req.execution_backend,
+                runtime_epoch: req.runtime_epoch,
+                active_delta: 1,
+                ingress_bytes: request_bytes.len() as u64,
+                egress_bytes: 0,
+            })
+            .await
+            .map_err(map_err)?;
+        (shard.backend, shard.vsock_path)
+    };
+
+    let transport_result: Result<Vec<u8>, ApiError> = async {
+        if backend == "mock" {
+            let response = match req.operation {
+                CriticalSectionOperation::Release => json!({
+                    "op": "critical_section_result",
+                    "operation": "release",
+                    "ok": true
+                }),
+                CriticalSectionOperation::Acquire => json!({
+                    "op": "critical_section_result",
+                    "operation": "acquire",
+                    "ok": true,
+                    "token": {
+                        "runtime_epoch": req.runtime_epoch,
+                        "owner_epoch": req.runtime_epoch,
+                        "sequence": 1
+                    },
+                    "expires_at_ms": 1
+                }),
+                CriticalSectionOperation::Renew => json!({
+                    "op": "critical_section_result",
+                    "operation": "renew",
+                    "ok": true,
+                    "token": req.token,
+                    "expires_at_ms": 1
+                }),
+            };
+            serde_json::to_vec(&response)
+                .map_err(|err| api_error(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))
+        } else {
+            let path = vsock_path.as_deref().ok_or_else(|| {
+                api_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "runnable durable shard is missing vsock path",
+                )
+            })?;
+            invoke_over_vsock(
+                FsPath::new(path),
+                state.guest_vsock_port,
+                &request_bytes,
+                req.timeout_ms,
+                state.guest_max_frame_bytes,
+            )
+            .await
+            .map_err(|message| api_error(StatusCode::SERVICE_UNAVAILABLE, message))
+        }
+    }
+    .await;
+
+    let response_len = transport_result
+        .as_ref()
+        .map(|bytes| bytes.len())
+        .unwrap_or(0);
+    let cleanup = state
+        .host
+        .touch(TouchRequest {
+            tenant_id: req.tenant_id.clone(),
+            shard_id: req.shard_id.clone(),
+            execution_class: req.execution_class,
+            execution_backend: req.execution_backend,
+            runtime_epoch: req.runtime_epoch,
+            active_delta: -1,
+            ingress_bytes: 0,
+            egress_bytes: response_len as u64,
+        })
+        .await;
+    if let Err(err) = cleanup {
+        return Err(map_err(err));
+    }
+
+    let response_bytes = transport_result?;
+    let response = validate_critical_section_response(&response_bytes, req.operation)
+        .map_err(|message| api_error(StatusCode::BAD_GATEWAY, message))?;
+    Ok(Json(response))
+}
+
 async fn invoke(
     State(state): State<AppState>,
     Json(signed): Json<SignedRequest<InvokeRequest>>,
@@ -647,6 +828,87 @@ fn valid_capability_name(name: &str) -> bool {
     }
     name.bytes()
         .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+}
+
+fn validate_critical_section_request(req: &CriticalSectionRequest) -> Result<(), ApiError> {
+    if req.timeout_ms == 0 || req.timeout_ms > 60_000 {
+        return Err(api_error(
+            StatusCode::BAD_REQUEST,
+            "timeout_ms must be 1..=60000",
+        ));
+    }
+    if !valid_runtime_identifier(&req.namespace) {
+        return Err(api_error(
+            StatusCode::BAD_REQUEST,
+            "namespace must use 1..=128 ASCII letters, digits, '.', '_' or '-'",
+        ));
+    }
+    if req.object_key.is_empty() || req.object_key.len() > 4096 || req.object_key.contains('\0') {
+        return Err(api_error(
+            StatusCode::BAD_REQUEST,
+            "object_key must be 1..=4096 bytes and contain no NUL",
+        ));
+    }
+    if req.holder.is_empty() || req.holder.len() > 256 || req.holder.contains('\0') {
+        return Err(api_error(
+            StatusCode::BAD_REQUEST,
+            "holder must be 1..=256 bytes and contain no NUL",
+        ));
+    }
+    let lease_ok = req.lease_ms.is_some_and(|lease| (1..=300_000).contains(&lease));
+    let token_ok = req.token.as_ref().is_some_and(|token| {
+        token.runtime_epoch > 0 && token.owner_epoch > 0 && token.sequence > 0
+    });
+    let valid = match req.operation {
+        CriticalSectionOperation::Acquire => lease_ok && req.token.is_none(),
+        CriticalSectionOperation::Renew => lease_ok && token_ok,
+        CriticalSectionOperation::Release => req.lease_ms.is_none() && token_ok,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(api_error(
+            StatusCode::BAD_REQUEST,
+            "invalid acquire/renew/release arguments",
+        ))
+    }
+}
+
+fn critical_section_envelope(req: &CriticalSectionRequest) -> Value {
+    json!({
+        "op": "critical_section",
+        "operation": req.operation,
+        "tenant_id": &req.tenant_id,
+        "namespace": &req.namespace,
+        "object_key": &req.object_key,
+        "runtime_epoch": req.runtime_epoch,
+        "holder": &req.holder,
+        "lease_ms": req.lease_ms,
+        "token": req.token
+    })
+}
+
+fn validate_critical_section_response(
+    bytes: &[u8],
+    expected_operation: CriticalSectionOperation,
+) -> Result<Value, String> {
+    let response: Value = serde_json::from_slice(bytes)
+        .map_err(|err| format!("invalid guest critical-section response: {err}"))?;
+    if response.get("op").and_then(Value::as_str) != Some("critical_section_result") {
+        return Err("guest critical-section response has wrong operation type".into());
+    }
+    let expected = match expected_operation {
+        CriticalSectionOperation::Acquire => "acquire",
+        CriticalSectionOperation::Renew => "renew",
+        CriticalSectionOperation::Release => "release",
+    };
+    if response.get("operation").and_then(Value::as_str) != Some(expected) {
+        return Err("guest critical-section response operation does not match request".into());
+    }
+    if response.get("ok").and_then(Value::as_bool).is_none() {
+        return Err("guest critical-section response is missing ok".into());
+    }
+    Ok(response)
 }
 
 fn guest_invocation_envelope(req: &InvokeRequest, deployment_id: &str) -> Value {
@@ -940,6 +1202,10 @@ async fn get_shard(
         .await
         .map(Json)
         .map_err(map_err)
+}
+
+fn default_critical_section_timeout_ms() -> u64 {
+    10_000
 }
 
 fn default_activation_timeout_ms() -> u64 {
@@ -1240,6 +1506,30 @@ mod tests {
         assert!(consume_runtime_nonce(&mut consumed, "nonce-2", 200, 131).is_ok());
         assert!(!consumed.contains_key("nonce-1"));
         assert!(consumed.contains_key("nonce-2"));
+    }
+
+    #[test]
+    fn validates_critical_section_operation_shapes() {
+        let acquire = CriticalSectionRequest {
+            tenant_id: "tenant-1".into(),
+            shard_id: "deployment-1".into(),
+            execution_class: ExecutionClass::DurableActor,
+            execution_backend: ExecutionBackend::Firecracker,
+            runtime_epoch: 7,
+            deployment_id: "a".repeat(64),
+            operation: CriticalSectionOperation::Acquire,
+            namespace: "locks".into(),
+            object_key: "orders/42".into(),
+            holder: "worker-a".into(),
+            lease_ms: Some(5_000),
+            token: None,
+            timeout_ms: 10_000,
+        };
+        assert!(validate_critical_section_request(&acquire).is_ok());
+
+        let mut invalid_release = acquire;
+        invalid_release.operation = CriticalSectionOperation::Release;
+        assert!(validate_critical_section_request(&invalid_release).is_err());
     }
 
     #[test]
