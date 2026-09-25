@@ -1,0 +1,23 @@
+name: beamscale-cli-provider-proof
+
+on:
+  push:
+    branches:
+      - beamscale-cli-provider-proof-20260925
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check combined CLI
+        run: cargo check --manifest-path beamscale-proof/Cargo.toml --all-targets
+      - name: Test combined CLI
+        run: cargo test --manifest-path beamscale-proof/Cargo.toml
