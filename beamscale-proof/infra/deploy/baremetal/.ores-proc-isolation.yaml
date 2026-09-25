@@ -1,0 +1,65 @@
+version: 1
+
+defaults:
+  group: tenant-worker
+
+groups:
+  tenant-worker:
+    members:
+      - bmscl-worker
+    filesystem:
+      # Keep these exact paths in parity with ores-proc-isolation-cli's
+      # reviewed --beamscale-honeypot boundary. Never broaden to /opt or /run.
+      read_only:
+        - /nix/store
+        - /opt/beamscale/honeypot-bin
+        - /run/bmscl-honeypot/tripwire.sock
+    network:
+      mode: external
+      deny_loopback: true
+      deny_private_networks: true
+    limits:
+      max_open_files: 128
+      cpu_seconds: 300
+    environment:
+      BMSCL_EXECUTION_MODE: tenant
+      # Hosted tenant code has no legitimate child-process contract. If a
+      # compromised runtime reaches PATH lookup, expose only inert tripwires.
+      PATH: /opt/beamscale/honeypot-bin
+
+  trusted-runtime:
+    members:
+      - bmscl-supervisor
+      - bmscl-router
+    filesystem:
+      read_only:
+        - /nix/store
+        - /etc/ssl/certs
+    network:
+      mode: external
+      deny_loopback: true
+      deny_private_networks: true
+    limits:
+      max_open_files: 4096
+      cpu_seconds: 86400
+    environment:
+      BMSCL_EXECUTION_MODE: trusted-runtime
+
+processes:
+  bmscl-worker:
+    group: tenant-worker
+    command:
+      - /usr/local/bin/bmscl-worker-host
+    environment: {}
+
+  bmscl-supervisor:
+    group: trusted-runtime
+    command:
+      - /usr/local/bin/bmscl-supervisor
+    environment: {}
+
+  bmscl-router:
+    group: trusted-runtime
+    command:
+      - /usr/local/bin/bmscl-router
+    environment: {}
