@@ -2,9 +2,9 @@ mod deploy;
 mod dev;
 mod docs_manifest;
 mod durable_objects;
+mod phoenix;
 mod provider_bundle;
 mod provider_deploy;
-mod phoenix;
 mod workspace;
 
 use anyhow::{bail, Context, Result};
@@ -446,21 +446,19 @@ fn main() -> Result<()> {
                 let bundle = bundle.context(
                     "--bundle is required for external providers; create it with bmscl provider-bundle",
                 )?;
-                let bundle_sha256 =
-                    provider_bundle::verify_for_deploy(&bundle, &artifact_dir)?;
+                let bundle_sha256 = provider_bundle::verify_for_deploy(&bundle, &artifact_dir)?;
                 provider_deploy::deploy(provider_deploy::ExternalDeployOptions {
                     provider,
                     image: image.context("--image is required for external providers")?,
                     aws_function,
                     gcp_service: service,
                     region: region.context("--region is required for external providers")?,
-                    gcp_project: gcp_project
-                        .or_else(|| env::var("GOOGLE_CLOUD_PROJECT").ok()),
+                    gcp_project: gcp_project.or_else(|| env::var("GOOGLE_CLOUD_PROJECT").ok()),
                     bundle_sha256,
                     dry_run,
                 })
             }
-        },
+        }
     }
 }
 
