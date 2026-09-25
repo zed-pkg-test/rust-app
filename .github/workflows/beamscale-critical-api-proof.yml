@@ -1,0 +1,23 @@
+name: beamscale-critical-api-proof
+
+on:
+  push:
+    branches:
+      - beamscale-critical-api-proof-20260925
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check API server
+        run: cargo check --manifest-path beamscale-critical-api-proof/Cargo.toml --all-targets
+      - name: Test API server
+        run: cargo test --manifest-path beamscale-critical-api-proof/Cargo.toml
