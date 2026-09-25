@@ -1106,14 +1106,27 @@ where
     let now = runtime_auth::now_unix()
         .map_err(|message| api_error(StatusCode::INTERNAL_SERVER_ERROR, message))?;
     let mut consumed = state.consumed_nonces.lock().await;
+    consume_runtime_nonce(
+        &mut consumed,
+        &contract.nonce,
+        expires_at,
+        now,
+    )
+    .map_err(|message| api_error(StatusCode::UNAUTHORIZED, message))
+}
+
+fn consume_runtime_nonce(
+    consumed: &mut HashMap<String, u64>,
+    nonce: &str,
+    expires_at: u64,
+    now: u64,
+) -> Result<(), &'static str> {
     consumed.retain(|_, expiry| *expiry >= now);
-    if consumed.insert(contract.nonce.clone(), expires_at).is_some() {
-        return Err(api_error(
-            StatusCode::UNAUTHORIZED,
-            "runtime control contract replay detected",
-        ));
+    if consumed.insert(nonce.to_owned(), expires_at).is_some() {
+        Err("runtime control contract replay detected")
+    } else {
+        Ok(())
     }
-    Ok(())
 }
 
 
@@ -1213,6 +1226,20 @@ mod tests {
             capability_refs,
             timeout_ms: 5_000,
         }
+    }
+
+    #[test]
+    fn runtime_control_nonce_is_one_time_until_expiry() {
+        let mut consumed = HashMap::new();
+        assert!(consume_runtime_nonce(&mut consumed, "nonce-1", 130, 100).is_ok());
+        assert_eq!(
+            consume_runtime_nonce(&mut consumed, "nonce-1", 130, 101),
+            Err("runtime control contract replay detected")
+        );
+
+        assert!(consume_runtime_nonce(&mut consumed, "nonce-2", 200, 131).is_ok());
+        assert!(!consumed.contains_key("nonce-1"));
+        assert!(consumed.contains_key("nonce-2"));
     }
 
     #[test]
