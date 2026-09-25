@@ -17,6 +17,9 @@ jobs:
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
+      - name: Validate deployment topology
+        working-directory: beamscale-proof/infra
+        run: python3 scripts/validate-deployment-topology.py deploy/topology.prod.json
       - name: Check runtime host
         working-directory: beamscale-proof/runtime-host
         run: cargo check --all-targets
