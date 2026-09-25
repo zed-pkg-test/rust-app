@@ -1,11 +1,17 @@
 defmodule BmsclPhoenixFixtureWeb.HealthController do
-  def show(_conn, _params), do: :ok
+  use Phoenix.Controller
+
+  def show(conn, _params), do: text(conn, "ok")
 end
 
 defmodule BmsclPhoenixFixtureWeb.DashboardController do
-  def index(_conn, _params), do: :ok
+  use Phoenix.Controller
+
+  def index(conn, _params), do: html(conn, "<main id=\"dashboard\">dashboard</main>")
 end
 
 defmodule BmsclPhoenixFixtureWeb.UserController do
-  def create(_conn, _params), do: :ok
+  use Phoenix.Controller
+
+  def create(conn, _params), do: json(conn, %{created: true})
 end
