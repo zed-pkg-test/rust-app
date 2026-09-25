@@ -25,7 +25,7 @@ for route <- Phoenix.Router.routes(router) do
     inspect(route.plug_opts, limit: :infinity)
   ]
 
-  IO.puts(Enum.join(fields, "\t"))
+  IO.puts("BMSCL_ROUTE\t" <> Enum.join(fields, "\t"))
 end
 "#;
 
@@ -47,7 +47,7 @@ for {path, _socket, opts} <- endpoint.__sockets__() do
   websocket = Keyword.get(opts, :websocket, true)
 
   if websocket != false do
-    IO.puts(to_string(path))
+    IO.puts("BMSCL_SOCKET\t" <> to_string(path))
   end
 end
 "#;
@@ -128,8 +128,13 @@ pub fn emit(options: PhoenixPlanOptions) -> Result<()> {
             &[("BMSCL_PHOENIX_ENDPOINT", endpoint)],
             "endpoint socket",
         )?;
-        for raw in socket_stdout.lines().filter(|line| !line.trim().is_empty()) {
-            socket_paths.insert(normalize_socket_path(raw)?);
+        for line in socket_stdout.lines() {
+            let Some(raw) = line.strip_prefix("BMSCL_SOCKET\t") else {
+                continue;
+            };
+            if !raw.trim().is_empty() {
+                socket_paths.insert(normalize_socket_path(raw)?);
+            }
         }
     }
     for raw in options.socket_paths {
@@ -216,7 +221,10 @@ fn parse_route_lines(stdout: &str) -> Result<Vec<RequestRoute>> {
         if line.trim().is_empty() {
             continue;
         }
-        let fields = line.splitn(4, '\t').collect::<Vec<_>>();
+        let Some(payload) = line.strip_prefix("BMSCL_ROUTE\t") else {
+            continue;
+        };
+        let fields = payload.splitn(4, '\t').collect::<Vec<_>>();
         if fields.len() != 4 {
             bail!(
                 "invalid Phoenix route probe output on line {}: expected 4 tab-separated fields",
@@ -319,7 +327,7 @@ mod tests {
     #[test]
     fn parses_request_routes() {
         let routes = parse_route_lines(
-            "GET\t/users/:id\tMyAppWeb.UserController\t:show\nPOST\t/users\tMyAppWeb.UserController\t:create\n",
+            "Compiling 2 files (.ex)\nBMSCL_ROUTE\tGET\t/users/:id\tMyAppWeb.UserController\t:show\nBMSCL_ROUTE\tPOST\t/users\tMyAppWeb.UserController\t:create\nGenerated app\n",
         )
         .unwrap();
         assert_eq!(routes.len(), 2);
@@ -331,8 +339,18 @@ mod tests {
 
     #[test]
     fn rejects_malformed_probe_output() {
-        let error = parse_route_lines("GET /users\n").unwrap_err();
+        let error = parse_route_lines("BMSCL_ROUTE\tGET /users\n").unwrap_err();
         assert!(error.to_string().contains("tab-separated"));
+    }
+
+    #[test]
+    fn ignores_unframed_mix_stdout() {
+        let routes = parse_route_lines(
+            "Compiling 4 files (.ex)\nGenerated app\nBMSCL_ROUTE\tGET\t/ok\tMyApp.Controller\t:index\n",
+        )
+        .unwrap();
+        assert_eq!(routes.len(), 1);
+        assert_eq!(routes[0].path, "/ok");
     }
 
     #[test]
