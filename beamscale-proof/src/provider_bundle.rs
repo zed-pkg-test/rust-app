@@ -68,8 +68,8 @@ pub(crate) fn build(options: BuildOptions) -> Result<ProviderBundle> {
         Some(path) => fs::read(path).with_context(|| format!("read {}", path.display()))?,
         None => generated_route_bytes(&artifacts, options.generation)?,
     };
-    let routing: Value = serde_json::from_slice(&route_bytes)
-        .context("parse provider route manifest")?;
+    let routing: Value =
+        serde_json::from_slice(&route_bytes).context("parse provider route manifest")?;
     validate_route_targets(&routing, &artifacts)?;
 
     let middleware_order = resolve_middleware_order(&options.middleware_order, &artifacts)?;
@@ -96,15 +96,12 @@ pub(crate) fn build(options: BuildOptions) -> Result<ProviderBundle> {
     Ok(bundle)
 }
 
-pub(crate) fn verify_for_deploy(
-    manifest_path: &Path,
-    artifact_dir: &Path,
-) -> Result<String> {
+pub(crate) fn verify_for_deploy(manifest_path: &Path, artifact_dir: &Path) -> Result<String> {
     let root = project_root()?;
     let manifest_path = confined_existing_file(&root, manifest_path, MAX_BUNDLE_BYTES)?;
     let artifact_dir = confined_existing_dir(&root, artifact_dir)?;
-    let bytes = fs::read(&manifest_path)
-        .with_context(|| format!("read {}", manifest_path.display()))?;
+    let bytes =
+        fs::read(&manifest_path).with_context(|| format!("read {}", manifest_path.display()))?;
     let bundle: ProviderBundle = serde_json::from_slice(&bytes)
         .with_context(|| format!("parse {}", manifest_path.display()))?;
     if bundle.schema_version != SCHEMA_V2 {
@@ -412,8 +409,11 @@ pub(crate) fn compute_bundle_sha256_v2(
     }
     let mut canonical = units.to_vec();
     canonical.sort_by(|left, right| {
-        (&left.kind, &left.name, &left.build_sha256)
-            .cmp(&(&right.kind, &right.name, &right.build_sha256))
+        (&left.kind, &left.name, &left.build_sha256).cmp(&(
+            &right.kind,
+            &right.name,
+            &right.build_sha256,
+        ))
     });
 
     let mut hash = Sha256::new();
@@ -458,15 +458,17 @@ fn write_bundle_atomically(
     let parent = out_dir
         .parent()
         .context("provider bundle output has no parent directory")?;
-    fs::create_dir_all(parent)
-        .with_context(|| format!("create {}", parent.display()))?;
+    fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
     let file_name = out_dir
         .file_name()
         .and_then(|name| name.to_str())
         .context("provider bundle output name must be UTF-8")?;
     let stage = parent.join(format!(".{file_name}.tmp-{}", std::process::id()));
     if stage.exists() {
-        bail!("provider bundle staging path already exists: {}", stage.display());
+        bail!(
+            "provider bundle staging path already exists: {}",
+            stage.display()
+        );
     }
 
     let result = (|| -> Result<()> {
@@ -480,8 +482,7 @@ fn write_bundle_atomically(
                 .join(&artifact.candidate.build_sha256);
             copy_tree_no_symlinks(&artifact.directory, &destination)?;
         }
-        fs::write(stage.join("routes.json"), route_bytes)
-            .context("write provider routes.json")?;
+        fs::write(stage.join("routes.json"), route_bytes).context("write provider routes.json")?;
         let bytes = serde_json::to_vec_pretty(bundle).context("encode provider bundle")?;
         fs::write(stage.join("provider-bundle.json"), bytes)
             .context("write provider-bundle.json")?;
@@ -502,30 +503,32 @@ fn write_bundle_atomically(
 }
 
 fn copy_tree_no_symlinks(source: &Path, destination: &Path) -> Result<()> {
-    let metadata = fs::symlink_metadata(source)
-        .with_context(|| format!("inspect {}", source.display()))?;
+    let metadata =
+        fs::symlink_metadata(source).with_context(|| format!("inspect {}", source.display()))?;
     if metadata.file_type().is_symlink() {
-        bail!("symlink is not allowed in provider bundle: {}", source.display());
+        bail!(
+            "symlink is not allowed in provider bundle: {}",
+            source.display()
+        );
     }
     if metadata.is_file() {
         if let Some(parent) = destination.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("create {}", parent.display()))?;
+            fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
         }
-        fs::copy(source, destination).with_context(|| {
-            format!("copy {} -> {}", source.display(), destination.display())
-        })?;
+        fs::copy(source, destination)
+            .with_context(|| format!("copy {} -> {}", source.display(), destination.display()))?;
         return Ok(());
     }
     if !metadata.is_dir() {
-        bail!("unsupported file type in provider bundle: {}", source.display());
+        bail!(
+            "unsupported file type in provider bundle: {}",
+            source.display()
+        );
     }
     if let Some(parent) = destination.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("create {}", parent.display()))?;
+        fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
     }
-    fs::create_dir(destination)
-        .with_context(|| format!("create {}", destination.display()))?;
+    fs::create_dir(destination).with_context(|| format!("create {}", destination.display()))?;
     let mut entries = fs::read_dir(source)
         .with_context(|| format!("read directory {}", source.display()))?
         .collect::<std::result::Result<Vec<_>, _>>()
@@ -538,10 +541,13 @@ fn copy_tree_no_symlinks(source: &Path, destination: &Path) -> Result<()> {
 }
 
 fn tree_sha256(root: &Path) -> Result<String> {
-    let metadata = fs::symlink_metadata(root)
-        .with_context(|| format!("inspect {}", root.display()))?;
+    let metadata =
+        fs::symlink_metadata(root).with_context(|| format!("inspect {}", root.display()))?;
     if metadata.file_type().is_symlink() || !metadata.is_dir() {
-        bail!("artifact tree root must be a regular directory: {}", root.display());
+        bail!(
+            "artifact tree root must be a regular directory: {}",
+            root.display()
+        );
     }
 
     fn visit(base: &Path, path: &Path, hash: &mut Sha256) -> Result<()> {
@@ -555,7 +561,10 @@ fn tree_sha256(root: &Path) -> Result<String> {
             let metadata = fs::symlink_metadata(&child)
                 .with_context(|| format!("inspect {}", child.display()))?;
             if metadata.file_type().is_symlink() {
-                bail!("symlink is not allowed in artifact tree: {}", child.display());
+                bail!(
+                    "symlink is not allowed in artifact tree: {}",
+                    child.display()
+                );
             }
             let relative = child
                 .strip_prefix(base)
@@ -573,12 +582,15 @@ fn tree_sha256(root: &Path) -> Result<String> {
                 hash.update([0]);
                 hash.update(relative.as_bytes());
                 hash.update([0]);
-                let bytes = fs::read(&child)
-                    .with_context(|| format!("read {}", child.display()))?;
+                let bytes =
+                    fs::read(&child).with_context(|| format!("read {}", child.display()))?;
                 hash.update(Sha256::digest(&bytes));
                 hash.update([0]);
             } else {
-                bail!("unsupported special file in artifact tree: {}", child.display());
+                bail!(
+                    "unsupported special file in artifact tree: {}",
+                    child.display()
+                );
             }
         }
         Ok(())
@@ -605,8 +617,8 @@ fn confined_existing_dir(root: &Path, configured: &Path) -> Result<PathBuf> {
 
 fn confined_existing_file(root: &Path, configured: &Path, max_bytes: u64) -> Result<PathBuf> {
     let path = confined_existing(root, configured)?;
-    let metadata = fs::symlink_metadata(&path)
-        .with_context(|| format!("inspect {}", path.display()))?;
+    let metadata =
+        fs::symlink_metadata(&path).with_context(|| format!("inspect {}", path.display()))?;
     if metadata.file_type().is_symlink() || !metadata.is_file() {
         bail!("{} must be a regular non-symlink file", path.display());
     }
@@ -638,9 +650,10 @@ fn confined_new_path(root: &Path, configured: &Path) -> Result<PathBuf> {
     if configured.as_os_str().is_empty() || configured.is_absolute() {
         bail!("new output path must be a non-empty project-relative path");
     }
-    if configured.components().any(|component| {
-        !matches!(component, Component::Normal(_))
-    }) {
+    if configured
+        .components()
+        .any(|component| !matches!(component, Component::Normal(_)))
+    {
         bail!("new output path must not contain . or .. components");
     }
     let candidate = root.join(configured);
@@ -695,8 +708,8 @@ fn resolve_bundle_path(base: &Path, relative: &str) -> Result<PathBuf> {
 }
 
 fn read_regular(path: &Path, max_bytes: u64) -> Result<Vec<u8>> {
-    let metadata = fs::symlink_metadata(path)
-        .with_context(|| format!("inspect {}", path.display()))?;
+    let metadata =
+        fs::symlink_metadata(path).with_context(|| format!("inspect {}", path.display()))?;
     if metadata.file_type().is_symlink() || !metadata.is_file() {
         bail!("{} must be a regular non-symlink file", path.display());
     }
@@ -741,8 +754,7 @@ mod tests {
                 artifact_path: "ignored/b".into(),
             },
         ];
-        let digest =
-            compute_bundle_sha256_v2(&units, &"c".repeat(64), &["auth".into()]).unwrap();
+        let digest = compute_bundle_sha256_v2(&units, &"c".repeat(64), &["auth".into()]).unwrap();
         assert_eq!(
             digest,
             "9673611180aca58df4a7d8a51816a9501152e545388e298c1d84836e26d7a755"

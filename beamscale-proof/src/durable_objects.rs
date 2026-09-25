@@ -57,8 +57,8 @@ fn dedicated() -> String {
 pub fn deploy(options: DeployOptions) -> Result<()> {
     let source = fs::read_to_string(&options.config)
         .with_context(|| format!("read {}", options.config.display()))?;
-    let config: DurableObjectsConfig = toml::from_str(&source)
-        .with_context(|| format!("parse {}", options.config.display()))?;
+    let config: DurableObjectsConfig =
+        toml::from_str(&source).with_context(|| format!("parse {}", options.config.display()))?;
     validate(&config)?;
 
     let artifact_dir = config.artifact.directory.as_ref().map(|directory| {
@@ -87,9 +87,15 @@ pub fn deploy(options: DeployOptions) -> Result<()> {
 
     if options.dry_run {
         if let Some(directory) = artifact_dir.as_deref() {
-            println!("dry-run: would upload admitted artifact from {}", directory.display());
+            println!(
+                "dry-run: would upload admitted artifact from {}",
+                directory.display()
+            );
         } else {
-            println!("dry-run: using already-admitted artifact sha256:{}", config.artifact.build_sha256);
+            println!(
+                "dry-run: using already-admitted artifact sha256:{}",
+                config.artifact.build_sha256
+            );
         }
         println!("{}", serde_json::to_string_pretty(&request)?);
         return Ok(());
@@ -120,7 +126,9 @@ pub fn deploy(options: DeployOptions) -> Result<()> {
         .with_context(|| format!("POST {url}"))?;
 
     let status = response.status();
-    let body = response.text().context("read BeamScale deployment response")?;
+    let body = response
+        .text()
+        .context("read BeamScale deployment response")?;
     if !status.is_success() {
         bail!("BeamScale deployment failed with HTTP {status}: {body}");
     }
@@ -132,8 +140,7 @@ pub fn deploy(options: DeployOptions) -> Result<()> {
 fn validate_local_artifact(directory: &std::path::Path, expected_build: &str) -> Result<()> {
     let manifest_path = directory.join("manifest.json");
     let manifest: serde_json::Value = serde_json::from_slice(
-        &fs::read(&manifest_path)
-            .with_context(|| format!("read {}", manifest_path.display()))?,
+        &fs::read(&manifest_path).with_context(|| format!("read {}", manifest_path.display()))?,
     )
     .with_context(|| format!("parse {}", manifest_path.display()))?;
     let actual = manifest
@@ -198,7 +205,9 @@ fn upload_artifact(
         .send()
         .with_context(|| format!("POST {url}"))?;
     let status = response.status();
-    let body = response.text().context("read BeamScale admission response")?;
+    let body = response
+        .text()
+        .context("read BeamScale admission response")?;
     if !status.is_success() {
         bail!("BeamScale artifact admission failed with HTTP {status}: {body}");
     }
