@@ -251,18 +251,20 @@ fn main() -> Result<()> {
             builder_image_digest,
             signing_key,
             key_id,
-        } => admit_release(PhoenixReleaseOptions {
-            release_dir,
-            out_dir,
-            app,
-            version,
-            router,
-            endpoint,
-            source_sha256,
-            builder_image_digest,
-            signing_key,
-            key_id,
-        }),
+        } => {
+            admit_release(PhoenixReleaseOptions {
+                release_dir,
+                out_dir,
+                app,
+                version,
+                router,
+                endpoint,
+                source_sha256,
+                builder_image_digest,
+                signing_key,
+                key_id,
+            })?;
+        }
         Commands::SigningRequest {
             artifact_dir,
             key_id,
