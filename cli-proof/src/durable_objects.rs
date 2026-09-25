@@ -234,7 +234,9 @@ pub fn deploy(options: DeployOptions) -> Result<()> {
         .with_context(|| format!("POST {url}"))?;
 
     let status = response.status();
-    let body = response.text().context("read BeamScale deployment response")?;
+    let body = response
+        .text()
+        .context("read BeamScale deployment response")?;
     if !status.is_success() {
         bail!("BeamScale deployment failed with HTTP {status}: {body}");
     }
@@ -291,8 +293,7 @@ fn resolve_build_sha256(
 fn read_artifact_manifest(directory: &Path) -> Result<ArtifactManifest> {
     let manifest_path = directory.join("manifest.json");
     serde_json::from_slice(
-        &fs::read(&manifest_path)
-            .with_context(|| format!("read {}", manifest_path.display()))?,
+        &fs::read(&manifest_path).with_context(|| format!("read {}", manifest_path.display()))?,
     )
     .with_context(|| format!("parse {}", manifest_path.display()))
 }
@@ -373,7 +374,9 @@ fn upload_artifact(
         .send()
         .with_context(|| format!("POST {url}"))?;
     let status = response.status();
-    let body = response.text().context("read BeamScale admission response")?;
+    let body = response
+        .text()
+        .context("read BeamScale admission response")?;
     if !status.is_success() {
         bail!("BeamScale artifact admission failed with HTTP {status}: {body}");
     }
