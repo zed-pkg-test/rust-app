@@ -1,0 +1,16 @@
+schema_version = 1
+tenant_id = "proof-tenant"
+namespace = "proof-critical"
+language = "erlang"
+tenancy_class = "tenant_dedicated"
+
+[build]
+project = "../compiler-proof/fixtures/critical_erlang"
+out_dir = "dist-critical"
+policy = "../compiler-proof/bmscl-policy.toml"
+
+[artifact]
+directory = "dist-critical"
+
+[deployment]
+id = "proof-critical"
