@@ -32,4 +32,5 @@ jobs:
         working-directory: phoenix-e2e
         env:
           BMSCL_CLI_DIR: ${{ github.workspace }}/beamscale-proof
+          BMSCL_COMPILER_DIR: ${{ github.workspace }}/compiler-proof
         run: bash scripts/run_phoenix_discovery_e2e.sh
