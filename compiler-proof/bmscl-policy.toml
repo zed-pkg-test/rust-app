@@ -1,0 +1,68 @@
+policy_version = "bmscl-hosted-gleam-v2-read-only"
+allowed_dependencies = ["gleam_stdlib"]
+trusted_sdk_sha256 = "2c5818e5306d4bbcc02796a6a58cb3f1942eb0cbabb19a7dee6c3d7df178ea6b"
+forbidden_import_prefixes = [
+  "gleam/erlang",
+  "gleam/otp",
+  "gleam_erlang",
+  "gleam/io",
+  "gleam/iterator",
+]
+forbidden_source_patterns = [
+  "@external(erlang",
+  "@external(elixir",
+  "@external(javascript",
+]
+forbidden_erlang_patterns = [
+  "os:",
+  "file:",
+  "filelib:",
+  "prim_file:",
+  "erl_prim_loader:",
+  "erl_tar:",
+  "zip:",
+  "code:",
+  "compile:",
+  "epp:",
+  "erl_eval:",
+  "erl_scan:",
+  "erl_parse:",
+  "erl_ddll:",
+  "net_kernel:",
+  "rpc:",
+  "erpc:",
+  "persistent_term:",
+  "ets:",
+  "dets:",
+  "mnesia:",
+  "disk_log:",
+  "proc_lib:",
+  "gen_server:start",
+  "gen_statem:start",
+  "supervisor:start",
+  "gen_tcp:",
+  "gen_udp:",
+  "socket:",
+  "ssl:",
+  "httpc:",
+  "inets:",
+  "inet:",
+  "erlang:spawn",
+  "erlang:apply",
+  "erlang:make_fun",
+  "erlang:halt",
+  "erlang:open_port",
+  "erlang:load_nif",
+  "-compile({parse_transform",
+  "-on_load(",
+]
+max_wall_ms = 30000
+max_reductions = 50000000
+max_heap_bytes = 67108864
+max_processes = 1
+
+# Production dependency use is fail-closed: every package in manifest.toml,
+# including transitive dependencies, must have its Hex outer_checksum pinned
+# here by the trusted BeamScale policy. Add approved checksums only after
+# reviewing that exact package release and its dependency closure.
+[allowed_dependency_checksums]
