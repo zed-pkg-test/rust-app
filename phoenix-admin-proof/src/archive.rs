@@ -72,9 +72,9 @@ pub(crate) fn extract_artifact(
         destination.join("route-plan.json").is_file() && destination.join("release").is_dir();
     match (worker_layout, phoenix_layout) {
         (true, false) | (false, true) => Ok(()),
-        (false, false) => bail!(
-            "archive must contain either beam/worker.beam or route-plan.json plus release/"
-        ),
+        (false, false) => {
+            bail!("archive must contain either beam/worker.beam or route-plan.json plus release/")
+        }
         (true, true) => bail!("archive must not mix worker and Phoenix release layouts"),
     }
 }
