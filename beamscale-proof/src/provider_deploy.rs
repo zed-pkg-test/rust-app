@@ -197,7 +197,7 @@ fn validate_immutable_image(value: &str) -> Result<()> {
     let Some((repository, digest)) = value.rsplit_once("@sha256:") else {
         bail!("--image must be immutable and end in @sha256:<64-lowercase-hex>");
     };
-    if repository.is_empty() || !valid_sha256(digest) {
+    if repository.is_empty() || validate_sha256(digest).is_err() {
         bail!("--image must be immutable and end in @sha256:<64-lowercase-hex>");
     }
     Ok(())
