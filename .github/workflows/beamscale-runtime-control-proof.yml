@@ -1,0 +1,22 @@
+name: beamscale-runtime-control-proof
+
+on:
+  push:
+    branches:
+      - beamscale-runtime-control-proof-20260925
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test exact BeamScale runtime-control modules
+        working-directory: beamscale-runtime-control-proof
+        run: cargo test --all-targets --locked
