@@ -112,8 +112,12 @@ pub fn emit(options: PhoenixPlanOptions) -> Result<()> {
     )?;
     let mut routes = parse_route_lines(&route_stdout)?;
     routes.sort_by(|left, right| {
-        (&left.method, &left.path, &left.handler, &left.action)
-            .cmp(&(&right.method, &right.path, &right.handler, &right.action))
+        (&left.method, &left.path, &left.handler, &left.action).cmp(&(
+            &right.method,
+            &right.path,
+            &right.handler,
+            &right.action,
+        ))
     });
 
     let mut socket_paths = BTreeSet::new();
@@ -151,12 +155,17 @@ pub fn emit(options: PhoenixPlanOptions) -> Result<()> {
         routes,
         connections,
     };
-    let mut json = serde_json::to_string_pretty(&plan).context("serialize Phoenix discovery plan")?;
+    let mut json =
+        serde_json::to_string_pretty(&plan).context("serialize Phoenix discovery plan")?;
     json.push('\n');
 
     match options.output {
         Some(path) => {
-            let path = if path.is_absolute() { path } else { project.join(path) };
+            let path = if path.is_absolute() {
+                path
+            } else {
+                project.join(path)
+            };
             ensure_output_confined(&project, &path)?;
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)
@@ -180,7 +189,10 @@ fn run_mix_probe(
     command
         .args(["run", "--no-start", "-e", probe])
         .current_dir(project)
-        .env("MIX_ENV", env::var("MIX_ENV").unwrap_or_else(|_| "prod".into()));
+        .env(
+            "MIX_ENV",
+            env::var("MIX_ENV").unwrap_or_else(|_| "prod".into()),
+        );
     for (name, value) in envs {
         command.env(name, value);
     }
@@ -246,9 +258,7 @@ fn validate_module_name(label: &str, value: &str) -> Result<()> {
 fn valid_http_method(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 16
-        && value
-            .bytes()
-            .all(|b| b.is_ascii_uppercase() || b == b'*')
+        && value.bytes().all(|b| b.is_ascii_uppercase() || b == b'*')
 }
 
 fn valid_route_path(path: &str) -> bool {
@@ -270,7 +280,9 @@ fn normalize_socket_path(value: &str) -> Result<String> {
 }
 
 fn ensure_output_confined(project: &Path, output: &Path) -> Result<()> {
-    let parent = output.parent().context("Phoenix plan output has no parent")?;
+    let parent = output
+        .parent()
+        .context("Phoenix plan output has no parent")?;
     let mut probe = parent;
     while !probe.exists() {
         probe = probe
