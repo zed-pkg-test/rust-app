@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: zed-pkg/zed-cli
-          ref: 9f7f1635dd830fce8e3d8dc75015d0a1734576aa
+          ref: ff7659371d799523252d418fb5f9b9563aae53af
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
       - name: Check zed-hex
