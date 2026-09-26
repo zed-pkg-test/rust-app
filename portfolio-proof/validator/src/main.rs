@@ -1,5 +1,9 @@
 use serde::Deserialize;
-use std::{collections::{HashMap, HashSet}, env, fs, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    env, fs,
+    path::Path,
+};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -86,12 +90,20 @@ fn non_empty(value: &str, label: &str) -> Result<(), String> {
 }
 
 fn is_sha(value: &str) -> bool {
-    value.len() == 40 && value.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    value.len() == 40
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
 }
 
 fn is_digest(value: &str) -> bool {
-    let Some(hex) = value.strip_prefix("sha256:") else { return false; };
-    hex.len() == 64 && hex.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    let Some(hex) = value.strip_prefix("sha256:") else {
+        return false;
+    };
+    hex.len() == 64
+        && hex
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
 }
 
 fn valid_repo_id(value: &str) -> bool {
@@ -102,7 +114,9 @@ fn valid_repo_id(value: &str) -> bool {
     [owner, repo].into_iter().all(|part| {
         !part.is_empty()
             && part.len() <= 100
-            && part.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+            && part
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
     })
 }
 
@@ -126,7 +140,10 @@ fn validate(snapshot: &Snapshot) -> Result<(), String> {
             return fail(format!("duplicate repository {}", repo.id));
         }
         if !is_sha(&repo.observed_commit) {
-            return fail(format!("{} observedCommit must be exact lowercase 40-hex SHA", repo.id));
+            return fail(format!(
+                "{} observedCommit must be exact lowercase 40-hex SHA",
+                repo.id
+            ));
         }
         if !matches!(repo.inspection_state.as_str(), "reviewed" | "uninspected") {
             return fail(format!("{} has invalid inspectionState", repo.id));
@@ -143,10 +160,20 @@ fn validate(snapshot: &Snapshot) -> Result<(), String> {
             }
         }
         non_empty(&repo.role, &format!("{}.role", repo.id))?;
-        non_empty(&repo.release_mechanism, &format!("{}.releaseMechanism", repo.id))?;
-        for value in repo.test_repositories.iter().chain(repo.deployment_consumers.iter()) {
+        non_empty(
+            &repo.release_mechanism,
+            &format!("{}.releaseMechanism", repo.id),
+        )?;
+        for value in repo
+            .test_repositories
+            .iter()
+            .chain(repo.deployment_consumers.iter())
+        {
             if !valid_repo_id(value) {
-                return fail(format!("{} references invalid repository {}", repo.id, value));
+                return fail(format!(
+                    "{} references invalid repository {}",
+                    repo.id, value
+                ));
             }
         }
         for dep in &repo.dependencies {
@@ -156,7 +183,10 @@ fn validate(snapshot: &Snapshot) -> Result<(), String> {
         }
     }
     if snapshot.coverage_state == "complete"
-        && snapshot.repositories.iter().any(|r| r.inspection_state != "reviewed")
+        && snapshot
+            .repositories
+            .iter()
+            .any(|r| r.inspection_state != "reviewed")
     {
         return fail("complete coverage cannot contain uninspected repositories");
     }
@@ -173,27 +203,44 @@ fn validate(snapshot: &Snapshot) -> Result<(), String> {
 
     let mut receipts = HashMap::new();
     for receipt in &snapshot.certifications {
-        if receipt.receipt_id.trim().is_empty() || receipts.contains_key(receipt.receipt_id.as_str()) {
-            return fail(format!("invalid or duplicate receiptId {}", receipt.receipt_id));
+        if receipt.receipt_id.trim().is_empty()
+            || receipts.contains_key(receipt.receipt_id.as_str())
+        {
+            return fail(format!(
+                "invalid or duplicate receiptId {}",
+                receipt.receipt_id
+            ));
         }
         if !repos.contains(receipt.source_repository.as_str()) {
-            return fail(format!("receipt {} source repository is absent", receipt.receipt_id));
+            return fail(format!(
+                "receipt {} source repository is absent",
+                receipt.receipt_id
+            ));
         }
         if !valid_repo_id(&receipt.execution_repository)
             || !is_sha(&receipt.source_commit)
             || !is_sha(&receipt.execution_commit)
             || !receipt.run_url.starts_with("https://github.com/")
         {
-            return fail(format!("receipt {} has invalid source/execution identity", receipt.receipt_id));
+            return fail(format!(
+                "receipt {} has invalid source/execution identity",
+                receipt.receipt_id
+            ));
         }
-        if !matches!(receipt.status.as_str(), "passed" | "failed" | "blocked" | "missing-evidence") {
+        if !matches!(
+            receipt.status.as_str(),
+            "passed" | "failed" | "blocked" | "missing-evidence"
+        ) {
             return fail(format!("receipt {} has invalid status", receipt.receipt_id));
         }
         if !matches!(
             receipt.infrastructure_state.as_str(),
             "executed" | "zero-step" | "missing-credentials" | "unavailable-runner"
         ) {
-            return fail(format!("receipt {} has invalid infrastructureState", receipt.receipt_id));
+            return fail(format!(
+                "receipt {} has invalid infrastructureState",
+                receipt.receipt_id
+            ));
         }
         if receipt.status == "passed"
             && (receipt.infrastructure_state != "executed" || receipt.commands.is_empty())
@@ -204,7 +251,10 @@ fn validate(snapshot: &Snapshot) -> Result<(), String> {
             ));
         }
         if receipt.infrastructure_state == "zero-step" && receipt.status == "passed" {
-            return fail(format!("receipt {} zero-step is missing evidence, never pass", receipt.receipt_id));
+            return fail(format!(
+                "receipt {} zero-step is missing evidence, never pass",
+                receipt.receipt_id
+            ));
         }
         for command in &receipt.commands {
             non_empty(command, "certification.commands")?;
@@ -214,12 +264,18 @@ fn validate(snapshot: &Snapshot) -> Result<(), String> {
         }
         for dep in &receipt.dependency_commits {
             if !valid_repo_id(&dep.repository) || !is_sha(&dep.commit) {
-                return fail(format!("receipt {} has invalid dependency commit", receipt.receipt_id));
+                return fail(format!(
+                    "receipt {} has invalid dependency commit",
+                    receipt.receipt_id
+                ));
             }
         }
         for digest in &receipt.artifact_digests {
             if !is_digest(digest) {
-                return fail(format!("receipt {} has invalid artifact digest", receipt.receipt_id));
+                return fail(format!(
+                    "receipt {} has invalid artifact digest",
+                    receipt.receipt_id
+                ));
             }
         }
         receipts.insert(receipt.receipt_id.as_str(), receipt);
@@ -234,11 +290,17 @@ fn validate(snapshot: &Snapshot) -> Result<(), String> {
         if !repos.contains(claim.repository.as_str()) {
             return fail(format!("claim {} repository is absent", claim.claim_id));
         }
-        if !matches!(claim.status.as_str(), "required" | "partial" | "verified" | "blocked") {
+        if !matches!(
+            claim.status.as_str(),
+            "required" | "partial" | "verified" | "blocked"
+        ) {
             return fail(format!("claim {} has invalid status", claim.claim_id));
         }
         if claim.risk_classes.is_empty()
-            || claim.risk_classes.iter().any(|risk| !allowed_risks.contains(&risk.as_str()))
+            || claim
+                .risk_classes
+                .iter()
+                .any(|risk| !allowed_risks.contains(&risk.as_str()))
         {
             return fail(format!("claim {} has invalid riskClasses", claim.claim_id));
         }
@@ -254,14 +316,23 @@ fn validate(snapshot: &Snapshot) -> Result<(), String> {
                 return fail(format!("claim {} needs non-empty {label}", claim.claim_id));
             }
         }
-        non_empty(&claim.broken_implementation_test, "brokenImplementationTest")?;
+        non_empty(
+            &claim.broken_implementation_test,
+            "brokenImplementationTest",
+        )?;
         if claim.status == "verified" {
             if claim.evidence_receipts.is_empty() {
-                return fail(format!("verified claim {} needs evidence receipts", claim.claim_id));
+                return fail(format!(
+                    "verified claim {} needs evidence receipts",
+                    claim.claim_id
+                ));
             }
             for id in &claim.evidence_receipts {
                 let Some(receipt) = receipts.get(id.as_str()) else {
-                    return fail(format!("claim {} references unknown receipt {}", claim.claim_id, id));
+                    return fail(format!(
+                        "claim {} references unknown receipt {}",
+                        claim.claim_id, id
+                    ));
                 };
                 if receipt.status != "passed" || receipt.source_repository != claim.repository {
                     return fail(format!(
@@ -299,7 +370,8 @@ mod tests {
     use super::*;
 
     fn minimal_snapshot() -> Snapshot {
-        serde_json::from_str(r#"{
+        serde_json::from_str(
+            r#"{
           "schemaVersion":"ores.portfolio-governance.v1",
           "coverageState":"partial",
           "repositories":[{
@@ -326,7 +398,9 @@ mod tests {
             "bounds":["one runtime"],"brokenImplementationTest":"tests/runtime.rs",
             "evidenceReceipts":["r1"]
           }]
-        }"#).unwrap()
+        }"#,
+        )
+        .unwrap()
     }
 
     #[test]
