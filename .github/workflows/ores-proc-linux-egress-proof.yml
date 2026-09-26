@@ -20,7 +20,13 @@ jobs:
       - name: Install isolation dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y bubblewrap slirp4netns iproute2 iptables curl util-linux
+          sudo apt-get install -y apparmor-profiles apparmor-utils bubblewrap slirp4netns iproute2 iptables curl util-linux
+          if [[ "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || printf '0')" == '1' ]]; then
+            profile=/usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+            test -f "$profile"
+            sudo install -m 0644 "$profile" /etc/apparmor.d/bwrap-userns-restrict
+            sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
+          fi
           bash -n proof/ores-proc-isolate.sh
 
       - name: Prove Internet egress and host isolation
