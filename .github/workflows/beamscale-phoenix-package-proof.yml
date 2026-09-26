@@ -1,0 +1,80 @@
+name: beamscale-phoenix-package-proof
+
+on:
+  push:
+    branches:
+      - beamscale-phoenix-package-proof-20260925
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124
+        with:
+          otp-version: "27.3"
+          elixir-version: "1.18.4"
+          gleam-version: "1.18.1"
+          rebar3-version: "3.24.0"
+          version-type: strict
+      - name: Install Hex/Rebar
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+      - name: Check compiler and new CLI bridge
+        run: |
+          cargo test --manifest-path compiler-proof/Cargo.toml --all-targets
+          cargo fmt --manifest-path cli-proof/Cargo.toml --all -- --check
+          cargo clippy --manifest-path cli-proof/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path cli-proof/Cargo.toml --all-targets
+          cargo build --manifest-path compiler-proof/Cargo.toml
+          cargo build --manifest-path cli-proof/Cargo.toml
+      - name: Build fixture and deterministic discovery plan
+        working-directory: phoenix-package-fixture
+        env:
+          MIX_ENV: prod
+        run: |
+          mix deps.get
+          mix compile
+          ../cli-proof/target/debug/bmscl phoenix-plan .             --router BmsclPhoenixFixtureWeb.Router             --endpoint BmsclPhoenixFixtureWeb.Endpoint             --output dist/phoenix-routes.json
+          mix release --overwrite
+          test -f _build/prod/rel/bmscl_phoenix_fixture/bin/bmscl_phoenix_fixture
+          test -f _build/prod/rel/bmscl_phoenix_fixture/releases/0.1.0/start.boot
+      - name: Package and verify signed Phoenix artifact
+        env:
+          BMSCL_COMPILER: ${{ github.workspace }}/compiler-proof/target/debug/bmscl-compiler
+          BMSCL_COMPILER_REVISION: "e1300bb973d002b7f6221b7c57da14b90ac9f782"
+        run: |
+          KEY="$RUNNER_TEMP/customer-key.hex"
+          printf '%064d\n' 1 > "$KEY"
+          SOURCE_SHA="$(
+            find phoenix-package-fixture -type f               -not -path '*/_build/*' -not -path '*/deps/*' -not -path '*/dist/*'               -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1
+          )"
+          cli-proof/target/debug/bmscl phoenix-package             --release-dir phoenix-package-fixture/_build/prod/rel/bmscl_phoenix_fixture             --out-dir phoenix-package-fixture/dist-phoenix             --app bmscl_phoenix_fixture             --version 0.1.0             --router BmsclPhoenixFixtureWeb.Router             --endpoint BmsclPhoenixFixtureWeb.Endpoint             --route-plan phoenix-package-fixture/dist/phoenix-routes.json             --source-sha256 "$SOURCE_SHA"             --builder-image-digest sha256:1111111111111111111111111111111111111111111111111111111111111111             --signing-key "$KEY"             --key-id proof-customer
+          PUB="$(compiler-proof/target/debug/bmscl-compiler public-key --signing-key "$KEY")"
+          compiler-proof/target/debug/bmscl-compiler verify             phoenix-package-fixture/dist-phoenix             --public-key "$PUB"             --key-id proof-customer
+          python3 - <<'PY'
+          import json, pathlib
+          root=pathlib.Path("phoenix-package-fixture/dist-phoenix")
+          m=json.loads((root/"manifest.json").read_text())
+          assert m["artifact_format"]=="bmscl-phoenix-release-v1", m
+          assert m["profile"]=="bmscl-phoenix-elixir-v1", m
+          assert m["execution_class"]=="phoenix", m
+          assert m["isolation_class"]=="firecracker", m
+          assert m["router"]=="BmsclPhoenixFixtureWeb.Router"
+          assert m["endpoint"]=="BmsclPhoenixFixtureWeb.Endpoint"
+          assert (root/"route-plan.json").is_file()
+          assert (root/"release/bin/bmscl_phoenix_fixture").is_file()
+          assert (root/"worker.tar.gz").is_file()
+          assert (root/"attestation.json").is_file()
+          print("PASS signed Phoenix release",m["build_sha256"])
+          PY
