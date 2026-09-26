@@ -77,10 +77,16 @@ impl ArtifactManifest {
             return Err(ManifestError::Runtime);
         }
         match self.profile.as_str() {
-            HOSTED_PROFILE_V1 | HOSTED_PROFILE_V2 | HOSTED_PROFILE_V3_HTTP | DURABLE_ACTOR_PROFILE_V1
+            HOSTED_PROFILE_V1
+            | HOSTED_PROFILE_V2
+            | HOSTED_PROFILE_V3_HTTP
+            | DURABLE_ACTOR_PROFILE_V1
                 if self.language == "gleam" => {}
             ERLANG_CRITICAL_SECTION_PROFILE_V1 if self.language == "erlang" => {}
-            HOSTED_PROFILE_V1 | HOSTED_PROFILE_V2 | HOSTED_PROFILE_V3_HTTP | DURABLE_ACTOR_PROFILE_V1
+            HOSTED_PROFILE_V1
+            | HOSTED_PROFILE_V2
+            | HOSTED_PROFILE_V3_HTTP
+            | DURABLE_ACTOR_PROFILE_V1
             | ERLANG_CRITICAL_SECTION_PROFILE_V1 => return Err(ManifestError::Runtime),
             _ => return Err(ManifestError::Profile),
         }
@@ -393,14 +399,20 @@ mod tests {
         descriptor.kind = ModuleKind::Http;
         descriptor.execution = ModuleExecution::default();
         descriptor.capabilities.push(HostedCapability::Http);
-        assert_eq!(manifest.validate_shared_tier_for_module(&descriptor), Ok(()));
+        assert_eq!(
+            manifest.validate_shared_tier_for_module(&descriptor),
+            Ok(())
+        );
     }
 
     #[test]
     fn rejects_legacy_cluster_call_capability_alias() {
         let mut manifest = valid_manifest();
         manifest.capabilities[1].name = "ctx.cluster_call".into();
-        assert_eq!(manifest.validate_shared_tier(), Err(ManifestError::Capability));
+        assert_eq!(
+            manifest.validate_shared_tier(),
+            Err(ManifestError::Capability)
+        );
     }
 
     #[test]
