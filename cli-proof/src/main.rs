@@ -140,6 +140,40 @@ enum Commands {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+    /// Package an already-built isolated Phoenix Mix release for Firecracker execution.
+    PhoenixPackage {
+        /// Existing Mix release directory. This command never runs Mix/build hooks itself.
+        #[arg(long)]
+        release_dir: PathBuf,
+        #[arg(long, default_value = "dist-phoenix")]
+        out_dir: PathBuf,
+        #[arg(long)]
+        app: String,
+        #[arg(long)]
+        version: String,
+        #[arg(long)]
+        router: String,
+        #[arg(long)]
+        endpoint: String,
+        /// Deterministic bmscl.phoenix.discovery.v2 plan generated with --endpoint.
+        #[arg(long)]
+        route_plan: PathBuf,
+        /// SHA-256 of the isolated builder's exact source snapshot.
+        #[arg(long)]
+        source_sha256: String,
+        /// Immutable isolated builder image digest, sha256:<64 lowercase hex>.
+        #[arg(long)]
+        builder_image_digest: String,
+        /// Ed25519 32-byte signing seed file encoded as 64 hex characters.
+        #[arg(long)]
+        signing_key: Option<PathBuf>,
+        /// Stable build-service signing key identifier.
+        #[arg(long)]
+        key_id: Option<String>,
+        /// Explicitly permit unsigned local/development output.
+        #[arg(long)]
+        unsigned: bool,
+    },
     /// Verify selected compiler artifacts locally using the canonical compiler verifier.
     Verify {
         #[arg(default_value = "dist")]
@@ -390,6 +424,33 @@ fn main() -> Result<()> {
             endpoint,
             socket_paths,
             output,
+        }),
+        Commands::PhoenixPackage {
+            release_dir,
+            out_dir,
+            app,
+            version,
+            router,
+            endpoint,
+            route_plan,
+            source_sha256,
+            builder_image_digest,
+            signing_key,
+            key_id,
+            unsigned,
+        } => phoenix::package(phoenix::PhoenixPackageOptions {
+            release_dir,
+            out_dir,
+            app,
+            version,
+            router,
+            endpoint,
+            route_plan,
+            source_sha256,
+            builder_image_digest,
+            signing_key,
+            key_id,
+            unsigned,
         }),
         Commands::Verify {
             artifact_dir,
