@@ -44,7 +44,7 @@ jobs:
             "format_version": 1,
             "artifact_format": "bmscl-phoenix-release-v1",
             "artifact_root": "release",
-            "runtime": "beam",
+            "runtime": "beam_release",
             "language": "elixir",
             "profile": "bmscl-phoenix-elixir-v1",
             "execution_class": "phoenix",
