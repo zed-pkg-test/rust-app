@@ -1,0 +1,35 @@
+name: Scintilla context ABI exact-source certification
+
+on:
+  pull_request:
+    paths:
+      - "certification/scintilla-context-abi/**"
+      - ".github/workflows/scintilla-context-abi-cert.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          lock=certification/scintilla-context-abi/SOURCE.lock.json
+          test "$(jq -r '.source_head' "$lock")" = "3bae587243b581558c2e612f182d990ffd9034d9"
+          jq -r '.blobs | to_entries[] | [.key,.value] | @tsv' "$lock" |
+          while IFS=$'\t' read -r rel expected; do
+            test "$(git hash-object "certification/scintilla-context-abi/$rel")" = "$expected"
+          done
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Prove Scintilla module-context contract
+        run: |
+          cargo fmt --manifest-path certification/scintilla-context-abi/Cargo.toml -- --check
+          cargo clippy --manifest-path certification/scintilla-context-abi/Cargo.toml --all-targets --all-features -- -D warnings
+          cargo test --manifest-path certification/scintilla-context-abi/Cargo.toml --all-targets --all-features

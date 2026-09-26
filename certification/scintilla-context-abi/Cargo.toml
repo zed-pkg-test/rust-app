@@ -1,0 +1,28 @@
+[package]
+name = "scintilla-lib-core"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+license = "MIT"
+description = "Canonical Scintilla persistence contracts, capability profiles, and DPM planning"
+repository = "https://github.com/scintilla-run/scintilla-lib-core"
+
+[features]
+default = ["contracts", "read"]
+contracts = []
+read = ["dep:sea-orm"]
+write = ["read"]
+migrator = ["contracts", "dep:tokio"]
+
+[dependencies]
+sea-orm = { version = "1.1", optional = true, default-features = false, features = ["runtime-tokio-rustls", "sqlx-postgres"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", optional = true, features = ["io-util", "macros", "process", "time"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "warn"
