@@ -15,7 +15,7 @@ url = "https://github.com/zed-pkg-test/rust-app"
 dir = ".vendor/.zed"
 
 [dependencies]
-"zed-pkg-test/rust-lib" = "^1.0.1"
+"zed-pkg-test/rust-lib" = "^1.0.0"
 
 [publish]
 exclude = ["target/**", ".vendor/**", ".zed/**"]
