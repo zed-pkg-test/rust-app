@@ -982,7 +982,7 @@ fn validate_phoenix_manifest(manifest: &PhoenixManifest) -> Result<(), ApiError>
     if manifest.format_version != 1
         || manifest.artifact_format != "bmscl-phoenix-release-v1"
         || manifest.artifact_root != "release"
-        || manifest.runtime != "beam"
+        || manifest.runtime != "beam_release"
         || manifest.language != "elixir"
         || manifest.profile != "bmscl-phoenix-elixir-v1"
         || manifest.execution_class != "phoenix"
@@ -1201,7 +1201,7 @@ mod tests {
     fn manifest(language: &str, profile: &str, max_processes: u32) -> ArtifactManifest {
         ArtifactManifest {
             format_version: 1,
-            runtime: "beam".into(),
+            runtime: "beam_release".into(),
             language: language.into(),
             profile: profile.into(),
             source_sha256: "a".repeat(64),
