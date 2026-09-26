@@ -3,6 +3,7 @@ import bmscl.{
   type ModuleKind, type ModulePolicy, type Request, type Response, Http,
   HttpClient, default_policy,
 }
+
 /// Opaque outbound-HTTP authority minted only by the trusted Hosted v3 adapter.
 /// Hosted v2 handlers continue to use `bmscl.Context` and never receive this.
 pub opaque type HttpCapability {
