@@ -10,10 +10,6 @@ on:
 permissions:
   contents: read
 
-env:
-  CERT_REPO: https://github.com/scintilla-run-test/gleam-lambda-runner-e2e.git
-  CERT_BRANCH: cert/beamscale-critical-section-chain-20260925
-
 jobs:
   runtime-host:
     runs-on: ubuntu-24.04
@@ -22,13 +18,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Materialize public exact-source carrier
-        run: git clone --depth 1 --branch "$CERT_BRANCH" "$CERT_REPO" /tmp/carrier
       - name: Verify PR40 source identities
         shell: bash
         run: |
           set -euo pipefail
-          root=/tmp/carrier/cert/beamscale-critical-section/infra-runtime-host
+          root=cert/beamscale-critical-section/infra-runtime-host
           test "$(git hash-object "$root/Cargo.toml")" = "2f13a3235f5acc68eb8bd4e90a8a194340366589"
           test "$(git hash-object "$root/src/artifact_store.rs")" = "05484a58d4e3b9d10230ef993926053297058cb0"
           test "$(git hash-object "$root/src/bin/bmscl-runtime-identity-writer.rs")" = "ab5a59b117f65bef4d3458d8f00146f106fbeb9f"
@@ -41,9 +35,9 @@ jobs:
           components: rustfmt, clippy
       - name: Prove exact runtime-host PR40 crate
         run: |
-          cargo fmt --manifest-path /tmp/carrier/cert/beamscale-critical-section/infra-runtime-host/Cargo.toml -- --check
-          cargo clippy --manifest-path /tmp/carrier/cert/beamscale-critical-section/infra-runtime-host/Cargo.toml --all-targets --all-features -- -D warnings
-          cargo test --manifest-path /tmp/carrier/cert/beamscale-critical-section/infra-runtime-host/Cargo.toml --all-targets
+          cargo fmt --manifest-path cert/beamscale-critical-section/infra-runtime-host/Cargo.toml -- --check
+          cargo clippy --manifest-path cert/beamscale-critical-section/infra-runtime-host/Cargo.toml --all-targets --all-features -- -D warnings
+          cargo test --manifest-path cert/beamscale-critical-section/infra-runtime-host/Cargo.toml --all-targets
 
   supervisor:
     runs-on: ubuntu-24.04
@@ -52,13 +46,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Materialize public exact-source carrier
-        run: git clone --depth 1 --branch "$CERT_BRANCH" "$CERT_REPO" /tmp/carrier
       - name: Verify PR96 source identities
         shell: bash
         run: |
           set -euo pipefail
-          root=/tmp/carrier/cert/beamscale-critical-section/supervisor
+          root=cert/beamscale-critical-section/supervisor
           test "$(git hash-object "$root/conformance/critical_section_formal_model.rs")" = "883cac38f1d98aacc17f7f15d6681499eebefa17"
           test "$(git hash-object "$root/src/bmscl_critical_section_actor.erl")" = "2905386b17430208a70a3d9a447e1d4d3ceba1f4"
           test "$(git hash-object "$root/src/bmscl_critical_section_registry.erl")" = "64e629b14078197d2a00c950f236b7bcac7c6136"
@@ -76,7 +68,7 @@ jobs:
           toolchain: stable
       - name: Exhaust exact current failover model
         run: |
-          rustc --edition=2021 -D warnings /tmp/carrier/cert/beamscale-critical-section/supervisor/conformance/critical_section_formal_model.rs -o /tmp/model
+          rustc --edition=2021 -D warnings cert/beamscale-critical-section/supervisor/conformance/critical_section_formal_model.rs -o /tmp/model
           /tmp/model
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124
         with:
@@ -86,7 +78,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          root=/tmp/carrier/cert/beamscale-critical-section/supervisor
+          root=cert/beamscale-critical-section/supervisor
           tmp="$(mktemp -d)"
           mkdir -p "$tmp/src" "$tmp/test"
           cp "$root"/src/*.erl "$tmp/src/"
@@ -114,13 +106,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Materialize public exact-source carrier
-        run: git clone --depth 1 --branch "$CERT_BRANCH" "$CERT_REPO" /tmp/carrier
       - name: Verify PR9 source identities
         shell: bash
         run: |
           set -euo pipefail
-          root=/tmp/carrier/cert/beamscale-critical-section/interfaces
+          root=cert/beamscale-critical-section/interfaces
           test "$(git hash-object "$root/package.json")" = "b949358d4c6a0f48ea55726f5c14eaa117635953"
           test "$(git hash-object "$root/typespec/main.tsp")" = "24a77ff8a5f5dd3fa1aa61fd55f4b6aaa0fb9b4f"
           test "$(git hash-object "$root/typespec/security.tsp")" = "5004133981dc282c06cb6190efb4ea217da31a4b"
@@ -136,7 +126,7 @@ jobs:
         with:
           node-version: "22"
       - name: Prove exact current interface contracts
-        working-directory: /tmp/carrier/cert/beamscale-critical-section/interfaces
+        working-directory: cert/beamscale-critical-section/interfaces
         run: |
           npm install
           npm run check
