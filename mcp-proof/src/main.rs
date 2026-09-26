@@ -79,7 +79,9 @@ fn dispatch(req: &RpcRequest) -> Value {
         }),
         "tools/call" => match serde_json::from_value::<ToolCall>(req.params.clone()) {
             Ok(call) => call_tool(call),
-            Err(error) => json!({"error": "invalid tools/call parameters", "detail": error.to_string()}),
+            Err(error) => {
+                json!({"error": "invalid tools/call parameters", "detail": error.to_string()})
+            }
         },
         "ping" => json!({"ok": true}),
         _ => json!({"error":"method not implemented"}),
