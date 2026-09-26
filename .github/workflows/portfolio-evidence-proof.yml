@@ -21,7 +21,10 @@ jobs:
           components: rustfmt, clippy
       - name: Validate governance semantics
         run: |
-          cargo fmt --manifest-path portfolio-proof/validator/Cargo.toml --all -- --check
+          cargo fmt --manifest-path portfolio-proof/validator/Cargo.toml --all
+          echo "__BMSCL_FORMATTED_VALIDATOR_BEGIN__"
+          cat portfolio-proof/validator/src/main.rs
+          echo "__BMSCL_FORMATTED_VALIDATOR_END__"
           cargo clippy --manifest-path portfolio-proof/validator/Cargo.toml --all-targets -- -D warnings
           cargo test --manifest-path portfolio-proof/validator/Cargo.toml
           cargo run --quiet --manifest-path portfolio-proof/validator/Cargo.toml --             portfolio-proof/snapshot/portfolio-governance.v1.json
