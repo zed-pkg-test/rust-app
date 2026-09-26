@@ -547,7 +547,10 @@ fn validate_record(
             "artifact is not in verified state".into(),
         ));
     }
-    if !matches!(record.archive_name.as_str(), "worker.zip" | "worker.tar.gz") {
+    if !matches!(
+        record.archive_name.as_str(),
+        "worker.zip" | "worker.tar.gz" | "phoenix-release.tar.gz"
+    ) {
         return Err(ArtifactStoreError::InvalidRecord(
             "archive_name is not canonical".into(),
         ));
