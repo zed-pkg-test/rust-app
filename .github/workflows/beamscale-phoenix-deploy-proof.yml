@@ -1,0 +1,78 @@
+name: beamscale-phoenix-deploy-proof
+
+on:
+  push:
+    branches:
+      - beamscale-phoenix-deploy-proof-20260926
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: API checks
+        run: |
+          cargo fmt --manifest-path phoenix-api-proof/Cargo.toml --all -- --check
+          cargo clippy --manifest-path phoenix-api-proof/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path phoenix-api-proof/Cargo.toml --all-targets
+
+      - name: CLI checks
+        run: |
+          cargo fmt --manifest-path phoenix-cli-proof/Cargo.toml --all -- --check
+          cargo clippy --manifest-path phoenix-cli-proof/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path phoenix-cli-proof/Cargo.toml --all-targets
+          cargo build --manifest-path phoenix-cli-proof/Cargo.toml
+
+      - name: Phoenix deploy dry-run contract
+        run: |
+          ROOT="$RUNNER_TEMP/phoenix-artifact"
+          mkdir -p "$ROOT/release"
+          printf '{}\n' > "$ROOT/route-plan.json"
+          cat > "$ROOT/manifest.json" <<'JSON'
+          {
+            "format_version": 1,
+            "artifact_format": "bmscl-phoenix-release-v1",
+            "artifact_root": "release",
+            "runtime": "beam",
+            "language": "elixir",
+            "profile": "bmscl-phoenix-elixir-v1",
+            "execution_class": "phoenix",
+            "isolation_class": "firecracker",
+            "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "build_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "provenance_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "app": "demo",
+            "version": "1.0.0",
+            "router": "DemoWeb.Router",
+            "endpoint": "DemoWeb.Endpoint",
+            "route_plan_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          }
+          JSON
+          phoenix-cli-proof/target/debug/bmscl phoenix-deploy "$ROOT" \
+            --tenant-id tenant-a \
+            --shard-id phoenix-a \
+            --deployment-id demo-g1 \
+            --dry-run > "$RUNNER_TEMP/request.json"
+          python3 - "$RUNNER_TEMP/request.json" <<'PY'
+          import json,sys
+          r=json.load(open(sys.argv[1]))
+          assert r["tenant_id"]=="tenant-a"
+          assert r["shard_id"]=="phoenix-a"
+          assert r["deployment_id"]=="demo-g1"
+          m=r["manifest"]
+          assert m["profile"]=="bmscl-phoenix-elixir-v1"
+          assert m["execution_class"]=="phoenix"
+          assert m["isolation_class"]=="firecracker"
+          print("PASS Phoenix CLI -> API typed deployment request")
+          PY
