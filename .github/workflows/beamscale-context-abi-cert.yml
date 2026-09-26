@@ -13,7 +13,7 @@ jobs:
   exact-head-contracts:
     runs-on: ubuntu-latest
     env:
-      BMSCL_LIB_CORE_HEAD: "659ae3b158a519557306b4384d1f1ab7e0e1590d"
+      BMSCL_LIB_CORE_HEAD: "6309a6a3e855243b582911cfc1c1d26ac06ce8c5"
       BMSCL_PUB_LIB_CORE_HEAD: "086cd04b2323498fa7234db8226ee030114f459a"
     steps:
       - uses: actions/checkout@v4
