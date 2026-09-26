@@ -168,8 +168,8 @@ pub fn deploy(options: PhoenixDeployOptions) -> Result<()> {
 
     let client = Client::new();
     upload_phoenix_artifact(&client, &options.admin_api_url, &archive)?;
-    let token = env::var("BMSCL_TOKEN")
-        .context("set BMSCL_TOKEN for Phoenix deployment authentication")?;
+    let token =
+        env::var("BMSCL_TOKEN").context("set BMSCL_TOKEN for Phoenix deployment authentication")?;
     let url = format!(
         "{}/v1/phoenix/deployments",
         options.api_url.trim_end_matches('/')
@@ -181,7 +181,9 @@ pub fn deploy(options: PhoenixDeployOptions) -> Result<()> {
         .send()
         .with_context(|| format!("POST {url}"))?;
     let status = response.status();
-    let body = response.text().context("read BeamScale Phoenix deployment response")?;
+    let body = response
+        .text()
+        .context("read BeamScale Phoenix deployment response")?;
     if !status.is_success() {
         bail!("BeamScale Phoenix deployment failed with HTTP {status}: {body}");
     }
