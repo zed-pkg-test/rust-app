@@ -82,10 +82,6 @@ pub struct Process {
     pub group: Option<String>,
     /// Absolute executable followed by fixed arguments.
     pub command: Vec<String>,
-    /// Optional absolute working directory. It must be covered by an explicit
-    /// read-only or read-write filesystem grant.
-    #[serde(default)]
-    pub working_directory: Option<PathBuf>,
     /// Process-specific environment variables layered over group variables.
     #[serde(default)]
     pub environment: BTreeMap<String, String>,
@@ -98,30 +94,17 @@ pub struct FilesystemPolicy {
     /// Additional host paths exposed read-only inside the sandbox.
     #[serde(default)]
     pub read_only: Vec<PathBuf>,
-    /// Additional host paths exposed read-write inside the sandbox.
-    ///
-    /// This is intended for narrowly scoped local-development workspaces. Host
-    /// root is always forbidden and overlapping read-only/read-write grants are
-    /// rejected to keep policy meaning unambiguous.
-    #[serde(default)]
-    pub read_write: Vec<PathBuf>,
 }
 
 /// Network mode for a process group.
 #[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum NetworkMode {
-    /// No network connectivity.
+    /// No network namespace connectivity at all.
     None,
     /// Outbound IP networking with host/local/private destinations blocked.
     #[default]
     External,
-    /// Explicit local-development networking on the host network namespace.
-    ///
-    /// This mode is currently implemented only by the macOS Seatbelt backend
-    /// and intentionally allows loopback/private networking so locally composed
-    /// services can communicate. It does not claim network-namespace isolation.
-    Local,
 }
 
 /// Network restrictions for a process group.
@@ -191,8 +174,6 @@ pub struct ResolvedProcess {
     pub group: String,
     /// Absolute configured executable before canonicalization.
     pub executable: PathBuf,
-    /// Optional configured working directory before canonicalization.
-    pub working_directory: Option<PathBuf>,
     /// Fixed configured arguments (extra invocation arguments are appended later).
     pub args: Vec<String>,
     /// Effective policy group.
@@ -279,19 +260,6 @@ impl Config {
             if process.command[0].contains('\0') {
                 return Err(format!("process {process_name:?} executable contains NUL"));
             }
-            if let Some(working_directory) = &process.working_directory {
-                if !working_directory.is_absolute() {
-                    return Err(format!(
-                        "process {process_name:?} working_directory must be absolute: {}",
-                        working_directory.display()
-                    ));
-                }
-                if working_directory == Path::new("/") {
-                    return Err(format!(
-                        "process {process_name:?} working_directory may not be host root"
-                    ));
-                }
-            }
             if let Some(explicit_group) = &process.group {
                 if !self.groups.contains_key(explicit_group) {
                     return Err(format!(
@@ -347,7 +315,6 @@ impl Config {
             name: process_name.to_owned(),
             group: group_name,
             executable: PathBuf::from(&process.command[0]),
-            working_directory: process.working_directory.clone(),
             args: process.command.iter().skip(1).cloned().collect(),
             policy,
             environment,
@@ -437,13 +404,6 @@ fn validate_group_policy(name: &str, group: &Group) -> std::result::Result<(), S
             "group {name:?} external networking must keep deny_private_networks=true"
         ));
     }
-    if group.network.mode == NetworkMode::Local
-        && (group.network.deny_loopback || group.network.deny_private_networks)
-    {
-        return Err(format!(
-            "group {name:?} local networking must explicitly set deny_loopback=false and deny_private_networks=false"
-        ));
-    }
 
     let mut seen = BTreeSet::new();
     for path in &group.filesystem.read_only {
@@ -465,36 +425,6 @@ fn validate_group_policy(name: &str, group: &Group) -> std::result::Result<(), S
             ));
         }
     }
-
-    let mut read_write = BTreeSet::new();
-    for path in &group.filesystem.read_write {
-        if !path.is_absolute() {
-            return Err(format!(
-                "group {name:?} read_write path must be absolute: {}",
-                path.display()
-            ));
-        }
-        if path == Path::new("/") {
-            return Err(format!(
-                "group {name:?} may not expose host root as read_write"
-            ));
-        }
-        if !read_write.insert(path) {
-            return Err(format!(
-                "group {name:?} has duplicate read_write path: {}",
-                path.display()
-            ));
-        }
-        if seen
-            .iter()
-            .any(|ro| path.starts_with(ro) || ro.starts_with(path))
-        {
-            return Err(format!(
-                "group {name:?} has overlapping read_only/read_write grants involving {}",
-                path.display()
-            ));
-        }
-    }
     Ok(())
 }
 
@@ -502,7 +432,7 @@ fn validate_environment(environment: &BTreeMap<String, String>) -> std::result::
     for (key, value) in environment {
         let valid_key = !key.is_empty()
             && key.bytes().enumerate().all(|(index, byte)| match byte {
-                b'A'..=b'Z' | b'a'..=b'z' | b'_' => true,
+                b'A'..=b'Z' | b'_' => true,
                 b'0'..=b'9' => index > 0,
                 _ => false,
             });
@@ -593,46 +523,5 @@ processes:
         assert_eq!(policy.mode, NetworkMode::External);
         assert!(policy.deny_loopback);
         assert!(policy.deny_private_networks);
-    }
-
-    #[test]
-    fn local_network_requires_explicit_host_network_acknowledgement() {
-        let mut config = fixture();
-        {
-            let group = config.groups.get_mut("base").unwrap();
-            group.network.mode = NetworkMode::Local;
-        }
-        assert!(config.validate().is_err());
-
-        {
-            let group = config.groups.get_mut("base").unwrap();
-            group.network.deny_loopback = false;
-            group.network.deny_private_networks = false;
-        }
-        config.validate().expect("explicit local mode");
-    }
-
-    #[test]
-    fn read_write_root_and_overlaps_fail_closed() {
-        let mut config = fixture();
-        {
-            let group = config.groups.get_mut("base").unwrap();
-            group.filesystem.read_write.push(PathBuf::from("/"));
-        }
-        assert!(config.validate().is_err());
-
-        {
-            let group = config.groups.get_mut("base").unwrap();
-            group.filesystem.read_write.clear();
-            group
-                .filesystem
-                .read_only
-                .push(PathBuf::from("/tmp/project"));
-            group
-                .filesystem
-                .read_write
-                .push(PathBuf::from("/tmp/project/cache"));
-        }
-        assert!(config.validate().is_err());
     }
 }

@@ -65,14 +65,10 @@ pub struct SandboxPlan {
     pub group: String,
     /// Canonical host executable path exposed into the sandbox.
     pub executable: PathBuf,
-    /// Canonical working directory, when one is explicitly configured.
-    pub working_directory: Option<PathBuf>,
     /// Complete target argv excluding argv[0].
     pub args: Vec<String>,
     /// Canonical explicit read-only host paths.
     pub read_only: Vec<PathBuf>,
-    /// Canonical explicit read-write host paths.
-    pub read_write: Vec<PathBuf>,
     /// Effective network policy.
     pub network: NetworkPolicy,
     /// Effective resource bounds.
@@ -109,12 +105,6 @@ pub fn prepare_plan(
     if beamscale_honeypot && platform != HostPlatform::Linux {
         return Err(Error::SandboxUnavailable(
             "BeamScale honeypot integration requires the Linux cgroup/namespace backend".to_owned(),
-        ));
-    }
-    if platform == HostPlatform::Linux && resolved.policy.network.mode == NetworkMode::Local {
-        return Err(Error::SandboxUnavailable(
-            "network.mode=local is currently a macOS local-development capability; Linux callers must use none or strict external mode"
-                .to_owned(),
         ));
     }
     if platform == HostPlatform::Macos
@@ -159,58 +149,6 @@ pub fn prepare_plan(
         }
     }
 
-    let mut read_write = Vec::new();
-    for path in &resolved.policy.filesystem.read_write {
-        let canonical = fs::canonicalize(path).map_err(|error| {
-            Error::Executable(format!(
-                "cannot canonicalize read-write path {}: {error}",
-                path.display()
-            ))
-        })?;
-        if canonical == Path::new("/") {
-            return Err(Error::Executable(
-                "refusing to expose host root as read-write".to_owned(),
-            ));
-        }
-        if seen
-            .iter()
-            .any(|existing| canonical.starts_with(existing) || existing.starts_with(&canonical))
-        {
-            return Err(Error::Executable(format!(
-                "read-write path overlaps another filesystem grant: {}",
-                canonical.display()
-            )));
-        }
-        if seen.insert(canonical.clone()) {
-            read_write.push(canonical);
-        }
-    }
-
-    let working_directory = resolved
-        .working_directory
-        .as_ref()
-        .map(|path| {
-            fs::canonicalize(path).map_err(|error| {
-                Error::Executable(format!(
-                    "cannot canonicalize working directory {}: {error}",
-                    path.display()
-                ))
-            })
-        })
-        .transpose()?;
-    if let Some(cwd) = &working_directory {
-        let covered = read_only
-            .iter()
-            .chain(read_write.iter())
-            .any(|root| cwd == root || cwd.starts_with(root));
-        if !covered {
-            return Err(Error::Executable(format!(
-                "working directory must be covered by an explicit filesystem grant: {}",
-                cwd.display()
-            )));
-        }
-    }
-
     let mut args = resolved.args.clone();
     args.extend(extra_args.iter().cloned());
     let environment_keys = resolved.environment.keys().cloned().collect();
@@ -226,10 +164,8 @@ pub fn prepare_plan(
         process: resolved.name,
         group: resolved.group,
         executable,
-        working_directory,
         args,
         read_only,
-        read_write,
         network: resolved.policy.network,
         limits: resolved.policy.limits,
         beamscale_honeypot,

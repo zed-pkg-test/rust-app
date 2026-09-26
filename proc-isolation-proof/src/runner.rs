@@ -61,22 +61,11 @@ pub fn run(cli: Cli) -> Result<i32> {
                 process: resolved.name,
                 group: resolved.group,
                 executable: resolved.executable.display().to_string(),
-                working_directory: resolved
-                    .working_directory
-                    .as_ref()
-                    .map(|path| path.display().to_string()),
                 fixed_args: resolved.args,
                 read_only: resolved
                     .policy
                     .filesystem
                     .read_only
-                    .iter()
-                    .map(|path| path.display().to_string())
-                    .collect(),
-                read_write: resolved
-                    .policy
-                    .filesystem
-                    .read_write
                     .iter()
                     .map(|path| path.display().to_string())
                     .collect(),
@@ -157,10 +146,8 @@ struct ExplainReport {
     process: String,
     group: String,
     executable: String,
-    working_directory: Option<String>,
     fixed_args: Vec<String>,
     read_only: Vec<String>,
-    read_write: Vec<String>,
     network: crate::config::NetworkPolicy,
     limits: crate::config::ResourceLimits,
     environment_keys: Vec<String>,

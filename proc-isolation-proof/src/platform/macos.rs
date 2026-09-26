@@ -25,29 +25,11 @@ pub(super) fn launch(plan: &SandboxPlan) -> Result<i32> {
                 .to_owned(),
         ));
     }
-    if plan.network.mode == NetworkMode::Local
-        && (plan.network.deny_loopback || plan.network.deny_private_networks)
-    {
-        return Err(Error::SandboxUnavailable(
-            "macOS local-development networking requires explicit loopback/private access acknowledgement"
-                .to_owned(),
-        ));
-    }
 
     let mut helper = NamedTempFile::new().map_err(Error::HelperIo)?;
     helper
         .write_all(HELPER.as_bytes())
         .map_err(Error::HelperIo)?;
-
-    let mut environment_file = NamedTempFile::new().map_err(Error::HelperIo)?;
-    for (key, value) in &plan.environment {
-        environment_file
-            .write_all(key.as_bytes())
-            .and_then(|_| environment_file.write_all(&[0]))
-            .and_then(|_| environment_file.write_all(value.as_bytes()))
-            .and_then(|_| environment_file.write_all(&[0]))
-            .map_err(Error::HelperIo)?;
-    }
 
     let mut command = Command::new("/bin/bash");
     command
@@ -61,35 +43,20 @@ pub(super) fn launch(plan: &SandboxPlan) -> Result<i32> {
         .arg(match plan.network.mode {
             NetworkMode::None => "none",
             NetworkMode::External => "external",
-            NetworkMode::Local => "local",
         })
         .arg("--max-open-files")
         .arg(plan.limits.max_open_files.to_string())
         .arg("--cpu-seconds")
-        .arg(plan.limits.cpu_seconds.to_string());
+        .arg(plan.limits.cpu_seconds.to_string())
+        .arg("--deny-loopback");
 
-    if plan.network.deny_loopback {
-        command.arg("--deny-loopback");
-    } else {
-        command.arg("--allow-loopback");
-    }
-    if plan.network.deny_private_networks {
-        command.arg("--deny-private");
-    }
-    if let Some(working_directory) = &plan.working_directory {
-        command.arg("--cwd").arg(working_directory);
-    }
     for path in &plan.read_only {
         command.arg("--ro").arg(path);
     }
-    for path in &plan.read_write {
-        command.arg("--rw").arg(path);
+    for (key, value) in &plan.environment {
+        command.arg("--env").arg(key).arg(value);
     }
-    command
-        .arg("--env-file")
-        .arg(environment_file.path())
-        .arg("--")
-        .args(&plan.args);
+    command.arg("--").args(&plan.args);
 
     let status = command
         .status()
@@ -132,7 +99,6 @@ pub(super) fn doctor(config: &Config) -> DoctorReport {
         notes: vec![
             "Seatbelt starts from (deny default); the target gets system runtime reads, its executable, and explicitly configured read-only paths only.".to_owned(),
             "network.mode=none is supported; strict Internet-only external mode fails closed because equivalent destination filtering is unavailable.".to_owned(),
-            "network.mode=local is an explicit local-development mode: it keeps Seatbelt filesystem/process restrictions but allows host/loopback networking and does not create or switch Unix users.".to_owned(),
             "sandbox-exec is deprecated by Apple but remains the available kernel Seatbelt launcher on current macOS; this backend fails closed if it is absent.".to_owned(),
         ],
     }

@@ -11,10 +11,7 @@ DENY_LOOPBACK='1'
 DENY_PRIVATE='0'
 MAX_OPEN_FILES='128'
 CPU_SECONDS='300'
-CWD=''
 RO_PATHS=()
-RW_PATHS=()
-ENV_FILE=''
 ENV_KEYS=()
 ENV_VALUES=()
 TARGET_ARGS=()
@@ -58,25 +55,16 @@ while (($#)); do
       CPU_SECONDS=$2
       shift 2
       ;;
-    --cwd)
-      (($# >= 2)) || fatal '--cwd requires a value'
-      CWD=$2
-      shift 2
-      ;;
     --ro)
       (($# >= 2)) || fatal '--ro requires a value'
       RO_PATHS+=("$2")
       shift 2
       ;;
-    --rw)
-      (($# >= 2)) || fatal '--rw requires a value'
-      RW_PATHS+=("$2")
-      shift 2
-      ;;
-    --env-file)
-      (($# >= 2)) || fatal '--env-file requires a value'
-      ENV_FILE=$2
-      shift 2
+    --env)
+      (($# >= 3)) || fatal '--env requires KEY VALUE'
+      ENV_KEYS+=("$2")
+      ENV_VALUES+=("$3")
+      shift 3
       ;;
     --)
       shift
@@ -93,23 +81,11 @@ done
 [[ "$EXE" == /* ]] || fatal 'executable must be absolute'
 [[ -f "$EXE" ]] || fatal "executable does not exist: $EXE"
 [[ -x "$EXE" ]] || fatal "executable is not executable: $EXE"
-[[ "$NETWORK" == 'external' || "$NETWORK" == 'none' || "$NETWORK" == 'local' ]] || fatal "unsupported network mode: $NETWORK"
-if [[ "$NETWORK" == 'external' ]]; then
-  [[ "$DENY_LOOPBACK" == '1' ]] || fatal 'macOS strict external mode refuses host loopback access'
-  [[ "$DENY_PRIVATE" == '0' ]] || fatal 'macOS Seatbelt cannot express RFC1918/CIDR egress denial; refusing to weaken requested policy'
-elif [[ "$NETWORK" == 'local' ]]; then
-  [[ "$DENY_LOOPBACK" == '0' ]] || fatal 'macOS local mode requires explicit loopback access'
-  [[ "$DENY_PRIVATE" == '0' ]] || fatal 'macOS local mode requires explicit private-network access'
-fi
+[[ "$NETWORK" == 'external' || "$NETWORK" == 'none' ]] || fatal "unsupported network mode: $NETWORK"
+[[ "$DENY_LOOPBACK" == '1' ]] || fatal 'macOS strict external mode refuses host loopback access'
+[[ "$DENY_PRIVATE" == '0' ]] || fatal 'macOS Seatbelt cannot express RFC1918/CIDR egress denial; refusing to weaken requested policy'
 [[ -x /usr/bin/sandbox-exec ]] || fatal '/usr/bin/sandbox-exec is unavailable'
 [[ -x /usr/bin/env ]] || fatal '/usr/bin/env is unavailable'
-if [[ -n "$ENV_FILE" ]]; then
-  [[ -f "$ENV_FILE" && ! -L "$ENV_FILE" ]] || fatal 'environment file must be a real regular file'
-  while IFS= read -r -d '' key && IFS= read -r -d '' value; do
-    ENV_KEYS+=("$key")
-    ENV_VALUES+=("$value")
-  done <"$ENV_FILE"
-fi
 
 ulimit -n "$MAX_OPEN_FILES" || fatal 'unable to lower RLIMIT_NOFILE'
 ulimit -t "$CPU_SECONDS" || fatal 'unable to lower RLIMIT_CPU'
@@ -172,8 +148,7 @@ cat >"$PROFILE" <<'SBPL'
   (subpath "/System/Library/PrivateFrameworks")
   (subpath "/System/Library/SubFrameworks")
   (subpath "/usr/lib")
-  (subpath "/usr/share")
-  (subpath "/private/etc/ssl"))
+  (subpath "/usr/share"))
 (allow file-read* file-test-existence (literal "/"))
 
 ; CPU/runtime discovery required by common libc/runtimes.
@@ -208,12 +183,13 @@ cat >"$PROFILE" <<'SBPL'
 (allow iokit-open (iokit-registry-entry-class "RootDomainUserClient"))
 (allow system-mac-syscall (mac-policy-name "vnguard"))
 
-; Identity, DNS, routing, and TLS trust services. Keychain/securityd services
-; and arbitrary local Unix sockets remain denied.
+; Identity, DNS, routing, and TLS trust services. No arbitrary local unix socket
+; access is granted.
 (allow mach-lookup
   (global-name "com.apple.system.opendirectoryd.libinfo")
   (global-name "com.apple.system.opendirectoryd.membership")
   (global-name "com.apple.bsd.dirhelper")
+  (global-name "com.apple.SecurityServer")
   (global-name "com.apple.networkd")
   (global-name "com.apple.ocspd")
   (global-name "com.apple.trustd")
@@ -237,35 +213,13 @@ for ((i = 0; i < ${#RO_PATHS[@]}; i++)); do
   param="RO_PATH_$i"
   SANDBOX_ARGS+=(-D "$param=$ro_path")
   cat >>"$PROFILE" <<SBPL
-(allow file-read* file-map-executable file-test-existence
+(allow file-read* file-test-existence
   (literal (param "$param"))
   (subpath (param "$param")))
 (allow file-read-metadata file-test-existence
   (path-ancestors (param "$param")))
 SBPL
 done
-
-for ((i = 0; i < ${#RW_PATHS[@]}; i++)); do
-  rw_path=${RW_PATHS[$i]}
-  [[ "$rw_path" == /* ]] || fatal "read-write path must be absolute: $rw_path"
-  [[ "$rw_path" != / ]] || fatal 'refusing to expose host root read-write'
-  [[ -e "$rw_path" ]] || fatal "read-write path does not exist: $rw_path"
-  param="RW_PATH_$i"
-  SANDBOX_ARGS+=(-D "$param=$rw_path")
-  cat >>"$PROFILE" <<SBPL
-(allow file-read* file-write* file-map-executable file-ioctl file-test-existence
-  (literal (param "$param"))
-  (subpath (param "$param")))
-(allow file-read-metadata file-test-existence
-  (path-ancestors (param "$param")))
-SBPL
-done
-
-if [[ -n "$CWD" ]]; then
-  [[ "$CWD" == /* ]] || fatal "working directory must be absolute: $CWD"
-  [[ "$CWD" != / ]] || fatal 'refusing host root as working directory'
-  [[ -d "$CWD" ]] || fatal "working directory does not exist: $CWD"
-fi
 
 if [[ "$NETWORK" == 'external' ]]; then
   cat >>"$PROFILE" <<'SBPL'
@@ -273,15 +227,6 @@ if [[ "$NETWORK" == 'external' ]]; then
 ; broad IP rule. Inbound/bind and unix-domain sockets remain denied by default.
 (allow network-outbound (remote ip "*:*"))
 (deny network-outbound (remote ip "localhost:*"))
-SBPL
-elif [[ "$NETWORK" == 'local' ]]; then
-  cat >>"$PROFILE" <<'SBPL'
-; Explicit local-development IP networking. This intentionally permits host,
-; loopback, private, and external IP networking so locally composed services can
-; bind and communicate, while leaving Unix-domain sockets denied by default.
-(allow network-bind (local ip "*:*"))
-(allow network-inbound (local ip "*:*"))
-(allow network-outbound (remote ip "*:*"))
 SBPL
 fi
 
@@ -300,11 +245,7 @@ if ((${#TARGET_ARGS[@]})); then
   TARGET_COMMAND+=("${TARGET_ARGS[@]}")
 fi
 
-if [[ -n "$CWD" ]]; then
-  cd -- "$CWD"
-else
-  cd /
-fi
+cd /
 set +e
 /usr/bin/env -i "${ENV_ARGS[@]}" \
   /usr/bin/sandbox-exec "${SANDBOX_ARGS[@]}" -f "$PROFILE" -- \

@@ -24,7 +24,6 @@ BEAMSCALE_HONEYPOT='0'
 BEAMSCALE_TRIPWIRE_DIR='/opt/beamscale/honeypot-bin'
 BEAMSCALE_TRIPWIRE_SOCKET='/run/bmscl-honeypot/tripwire.sock'
 RO_PATHS=()
-ENV_FILE=''
 ENV_KEYS=()
 ENV_VALUES=()
 TARGET_ARGS=()
@@ -72,10 +71,11 @@ while (($#)); do
       RO_PATHS+=("$2")
       shift 2
       ;;
-    --env-file)
-      (($# >= 2)) || fatal '--env-file requires a value'
-      ENV_FILE=$2
-      shift 2
+    --env)
+      (($# >= 3)) || fatal '--env requires KEY VALUE'
+      ENV_KEYS+=("$2")
+      ENV_VALUES+=("$3")
+      shift 3
       ;;
     --)
       shift
@@ -98,13 +98,6 @@ done
 if [[ "$NETWORK" == 'external' ]]; then
   [[ "$DENY_LOOPBACK" == '1' ]] || fatal 'external networking requires loopback denial'
   [[ "$DENY_PRIVATE" == '1' ]] || fatal 'external networking requires private/local destination denial'
-fi
-if [[ -n "$ENV_FILE" ]]; then
-  [[ -f "$ENV_FILE" && ! -L "$ENV_FILE" ]] || fatal 'environment file must be a real regular file'
-  while IFS= read -r -d '' key && IFS= read -r -d '' value; do
-    ENV_KEYS+=("$key")
-    ENV_VALUES+=("$value")
-  done <"$ENV_FILE"
 fi
 if [[ "$BEAMSCALE_HONEYPOT" == '1' ]]; then
   [[ -d "$BEAMSCALE_TRIPWIRE_DIR" ]] || fatal "BeamScale tripwire directory is unavailable: $BEAMSCALE_TRIPWIRE_DIR"

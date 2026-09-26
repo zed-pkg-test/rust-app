@@ -65,16 +65,6 @@ pub(super) fn launch(plan: &SandboxPlan) -> Result<i32> {
     let bash = trusted_lookup("bash").ok_or_else(|| {
         Error::SandboxUnavailable("trusted bash is unavailable in system helper paths".to_owned())
     })?;
-    let mut environment_file = NamedTempFile::new().map_err(Error::HelperIo)?;
-    for (key, value) in &plan.environment {
-        environment_file
-            .write_all(key.as_bytes())
-            .and_then(|_| environment_file.write_all(&[0]))
-            .and_then(|_| environment_file.write_all(value.as_bytes()))
-            .and_then(|_| environment_file.write_all(&[0]))
-            .map_err(Error::HelperIo)?;
-    }
-
     let mut command = Command::new(bash);
     command
         .env_clear()
@@ -87,11 +77,6 @@ pub(super) fn launch(plan: &SandboxPlan) -> Result<i32> {
         .arg(match plan.network.mode {
             NetworkMode::None => "none",
             NetworkMode::External => "external",
-            NetworkMode::Local => {
-                return Err(Error::SandboxUnavailable(
-                    "network.mode=local is not implemented by the Linux backend".to_owned(),
-                ));
-            }
         })
         .arg("--max-open-files")
         .arg(plan.limits.max_open_files.to_string())
@@ -112,11 +97,10 @@ pub(super) fn launch(plan: &SandboxPlan) -> Result<i32> {
     for path in &plan.read_only {
         command.arg("--ro").arg(path);
     }
-    command
-        .arg("--env-file")
-        .arg(environment_file.path())
-        .arg("--")
-        .args(&plan.args);
+    for (key, value) in &plan.environment {
+        command.arg("--env").arg(key).arg(value);
+    }
+    command.arg("--").args(&plan.args);
 
     let status = command
         .status()

@@ -1,12 +1,12 @@
-name: ores-proc-isolation-pr13-proof
+name: ores-proc-isolation-pr12-proof
 
 on:
   push:
-    branches: [ores-proc-isolation-pr13-proof-20260925]
+    branches: [ores-proc-isolation-pr12-proof-20260925]
   pull_request:
     paths:
       - "proc-isolation-proof/**"
-      - ".github/workflows/ores-proc-isolation-pr13-proof.yml"
+      - ".github/workflows/ores-proc-isolation-pr12-proof.yml"
 
 permissions:
   contents: read
@@ -37,7 +37,7 @@ jobs:
           import json, subprocess
           from pathlib import Path
           manifest=json.loads(Path("proof-source.json").read_text())
-          assert manifest["sourceCommit"] == "ddd1ef79ccd4c7ad18567851096f617960883844"
+          assert manifest["sourceCommit"] == "28a29bbbd75acf4531e973d2c8ec92b68659375d"
           for path, expected in manifest["files"].items():
               actual=subprocess.check_output(["git","hash-object",path], text=True).strip()
               if actual != expected:
