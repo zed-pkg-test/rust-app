@@ -1013,10 +1013,19 @@ fn validate_phoenix_manifest(manifest: &PhoenixManifest) -> Result<(), ApiError>
     }
 
     validate_identity("app", &manifest.app)?;
-    if manifest.version.is_empty() || manifest.version.len() > 128 || manifest.version.as_bytes().contains(&0) {
-        return Err(api_error(StatusCode::BAD_REQUEST, "invalid Phoenix version"));
+    if manifest.version.is_empty()
+        || manifest.version.len() > 128
+        || manifest.version.as_bytes().contains(&0)
+    {
+        return Err(api_error(
+            StatusCode::BAD_REQUEST,
+            "invalid Phoenix version",
+        ));
     }
-    for (name, module) in [("router", &manifest.router), ("endpoint", &manifest.endpoint)] {
+    for (name, module) in [
+        ("router", &manifest.router),
+        ("endpoint", &manifest.endpoint),
+    ] {
         let valid = !module.is_empty()
             && module.len() <= 256
             && module.split('.').all(|segment| {
