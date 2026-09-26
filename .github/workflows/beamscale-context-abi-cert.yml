@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BMSCL_LIB_CORE_HEAD: "1c0e5ba53234cf40caf170f96a7a5b91a95377f8"
-      BMSCL_PUB_LIB_CORE_HEAD: "086cd04b2323498fa7234db8226ee030114f459a"
+      BMSCL_PUB_LIB_CORE_HEAD: "0cff101b81c9552e01dcdc05b6c25ec8ca0ab61d"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
