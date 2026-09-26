@@ -502,7 +502,7 @@ fn safe_mode(meta: &std::fs::Metadata, relative: &Path) -> Result<u32, ArtifactS
                 relative.display()
             )));
         }
-        return Ok(raw & 0o777);
+        Ok(raw & 0o777)
     }
     #[cfg(not(unix))]
     {
