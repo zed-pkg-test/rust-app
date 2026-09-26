@@ -1201,7 +1201,7 @@ mod tests {
     fn manifest(language: &str, profile: &str, max_processes: u32) -> ArtifactManifest {
         ArtifactManifest {
             format_version: 1,
-            runtime: "beam_release".into(),
+            runtime: "beam".into(),
             language: language.into(),
             profile: profile.into(),
             source_sha256: "a".repeat(64),
@@ -1225,7 +1225,7 @@ mod tests {
             format_version: 1,
             artifact_format: "bmscl-phoenix-release-v1".into(),
             artifact_root: "release".into(),
-            runtime: "beam".into(),
+            runtime: "beam_release".into(),
             language: "elixir".into(),
             profile: "bmscl-phoenix-elixir-v1".into(),
             execution_class: "phoenix".into(),
