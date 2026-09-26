@@ -39,6 +39,7 @@ jobs:
           ROOT="$RUNNER_TEMP/phoenix-artifact"
           mkdir -p "$ROOT/release"
           printf '{}\n' > "$ROOT/route-plan.json"
+          printf 'proof archive payload\n' | gzip -n > "$ROOT/phoenix-release.tar.gz"
           cat > "$ROOT/manifest.json" <<'JSON'
           {
             "format_version": 1,
