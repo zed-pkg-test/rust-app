@@ -37,7 +37,7 @@ jobs:
           import json, subprocess
           from pathlib import Path
           manifest=json.loads(Path("proof-source.json").read_text())
-          assert manifest["sourceCommit"] == "28a29bbbd75acf4531e973d2c8ec92b68659375d"
+          assert manifest["sourceCommit"] == "221449a9815808128d30fdb2e58d3e3f0e5ab392"
           for path, expected in manifest["files"].items():
               actual=subprocess.check_output(["git","hash-object",path], text=True).strip()
               if actual != expected:

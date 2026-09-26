@@ -2,7 +2,7 @@
   "schema": "ores.exact-head-proof/v1",
   "sourceRepository": "ORESoftware/ores-proc-isolation-cli",
   "sourcePullRequest": 12,
-  "sourceCommit": "28a29bbbd75acf4531e973d2c8ec92b68659375d",
+  "sourceCommit": "221449a9815808128d30fdb2e58d3e3f0e5ab392",
   "files": {
     ".cli-flags.toml": "b5732649df2be3ad9f27307e07c4c7cdbd5c10d7",
     ".ores-proc-isolation.yaml": "d7268c5f291d9521533be2d36da46bdd7c03a128",
@@ -22,7 +22,7 @@
     "src/runner.rs": "4b7148cf72a4d590be7572fe7efd97a452ac0e3d",
     "tests/beamscale_honeypot_profile.rs": "949a0378db47f114b6521cd0b4e33d6277dbddce",
     "tests/linux_helper_tripwire_contract.rs": "93ee15574982e68fdf9c2f2ae17b3d92b1db5f26",
-    "tests/linux_network_helper_liveness_contract.rs": "9635cf304f0eac7cb840f6550ee968e24d6713e3",
+    "tests/linux_network_helper_liveness_contract.rs": "a59b7d5777e92e7d60a81762a19a7540aad2b4d6",
     "tests/nixos_trusted_helper_contract.rs": "e7c15f68322ca27ff68cde5e72d1a4d17e19a305",
     "tests/policy.rs": "76e84045e4fc7b6450d3e84fd335e0fc46616ff0",
     "vendor/ores-reactive-maps/Cargo.toml": "bb037c526961038d62e40221c82c35a3f71c944f",
