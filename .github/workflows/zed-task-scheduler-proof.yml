@@ -1,0 +1,25 @@
+name: zed-task-scheduler-proof
+
+on:
+  push:
+    branches:
+      - zed-task-scheduler-proof-20260926
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: zed-pkg/zed-cli
+          ref: 4a527c45eb3436d68572601b0c4131fd943957d1
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check library
+        run: cargo check --lib
+      - name: Test scheduler module
+        run: cargo test --lib task_scheduler
