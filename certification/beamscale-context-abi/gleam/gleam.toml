@@ -1,0 +1,4 @@
+name = "bmscl_context_abi_cert"
+version = "0.0.0"
+target = "erlang"
+gleam = ">= 1.18.0"
