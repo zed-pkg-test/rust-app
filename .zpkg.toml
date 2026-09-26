@@ -22,4 +22,3 @@ exclude = ["target/**", ".vendor/**", ".zed/**"]
 
 [scripts]
 test = "cargo test --locked --all-targets"
-check = "cargo check --locked --all-targets"
