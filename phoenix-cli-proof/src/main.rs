@@ -188,6 +188,9 @@ enum Commands {
         /// BeamScale API URL. Defaults to BMSCL_API_URL or localhost:8081.
         #[arg(long)]
         api_url: Option<String>,
+        /// BeamScale admin API used for signed Phoenix artifact admission.
+        #[arg(long)]
+        admin_api_url: Option<String>,
         #[arg(long)]
         dry_run: bool,
     },
@@ -493,6 +496,7 @@ fn main() -> Result<()> {
             shard_id,
             deployment_id,
             api_url,
+            admin_api_url,
             dry_run,
         } => phoenix::deploy(phoenix::PhoenixDeployOptions {
             artifact_dir,
@@ -502,6 +506,9 @@ fn main() -> Result<()> {
             api_url: api_url
                 .or_else(|| env::var("BMSCL_API_URL").ok())
                 .unwrap_or_else(|| "http://127.0.0.1:8081".into()),
+            admin_api_url: admin_api_url
+                .or_else(|| env::var("BMSCL_ADMIN_API_URL").ok())
+                .unwrap_or_else(|| "http://127.0.0.1:8181".into()),
             dry_run,
         }),
         Commands::Benchmark {
