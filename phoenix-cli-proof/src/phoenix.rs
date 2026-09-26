@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use reqwest::blocking::Client;
+use reqwest::blocking::{multipart, Client};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeSet,
@@ -71,6 +71,7 @@ pub struct PhoenixDeployOptions {
     pub shard_id: String,
     pub deployment_id: Option<String>,
     pub api_url: String,
+    pub admin_api_url: String,
     pub dry_run: bool,
 }
 
@@ -148,18 +149,32 @@ pub fn deploy(options: PhoenixDeployOptions) -> Result<()> {
         manifest: &manifest,
     };
 
+    let archive = options.artifact_dir.join("phoenix-release.tar.gz");
+    if !archive.is_file() {
+        bail!(
+            "{} is missing phoenix-release.tar.gz",
+            options.artifact_dir.display()
+        );
+    }
+
     if options.dry_run {
+        eprintln!(
+            "dry-run: would upload admitted Phoenix archive from {}",
+            archive.display()
+        );
         println!("{}", serde_json::to_string_pretty(&request)?);
         return Ok(());
     }
 
+    let client = Client::new();
+    upload_phoenix_artifact(&client, &options.admin_api_url, &archive)?;
     let token = env::var("BMSCL_TOKEN")
         .context("set BMSCL_TOKEN for Phoenix deployment authentication")?;
     let url = format!(
         "{}/v1/phoenix/deployments",
         options.api_url.trim_end_matches('/')
     );
-    let response = Client::new()
+    let response = client
         .post(&url)
         .bearer_auth(token)
         .json(&request)
@@ -174,11 +189,47 @@ pub fn deploy(options: PhoenixDeployOptions) -> Result<()> {
     Ok(())
 }
 
+fn upload_phoenix_artifact(client: &Client, admin_api_url: &str, archive: &Path) -> Result<()> {
+    let bytes = fs::read(archive).with_context(|| format!("read {}", archive.display()))?;
+    let token = env::var("BMSCL_ADMIN_TOKEN")
+        .context("set BMSCL_ADMIN_TOKEN to upload a Phoenix release artifact")?;
+    let filename = archive
+        .file_name()
+        .and_then(|name| name.to_str())
+        .context("Phoenix archive filename must be UTF-8")?
+        .to_owned();
+    let url = format!(
+        "{}/v1/admin/deployments",
+        admin_api_url.trim_end_matches('/')
+    );
+    let response = client
+        .post(&url)
+        .bearer_auth(token)
+        .multipart(
+            multipart::Form::new().part(
+                "artifact",
+                multipart::Part::bytes(bytes)
+                    .file_name(filename)
+                    .mime_str("application/gzip")?,
+            ),
+        )
+        .send()
+        .with_context(|| format!("POST {url}"))?;
+    let status = response.status();
+    let body = response
+        .text()
+        .context("read BeamScale Phoenix artifact admission response")?;
+    if !status.is_success() {
+        bail!("BeamScale Phoenix artifact admission failed with HTTP {status}: {body}");
+    }
+    Ok(())
+}
+
 fn validate_artifact_manifest(manifest: &PhoenixArtifactManifest) -> Result<()> {
     if manifest.format_version != 1
         || manifest.artifact_format != "bmscl-phoenix-release-v1"
         || manifest.artifact_root != "release"
-        || manifest.runtime != "beam"
+        || manifest.runtime != "beam_release"
         || manifest.language != "elixir"
         || manifest.profile != "bmscl-phoenix-elixir-v1"
         || manifest.execution_class != "phoenix"
@@ -590,7 +641,7 @@ mod tests {
             format_version: 1,
             artifact_format: "bmscl-phoenix-release-v1".into(),
             artifact_root: "release".into(),
-            runtime: "beam".into(),
+            runtime: "beam_release".into(),
             language: "elixir".into(),
             profile: "bmscl-phoenix-elixir-v1".into(),
             execution_class: "phoenix".into(),
