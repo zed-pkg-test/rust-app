@@ -1,0 +1,99 @@
+name: ores-proc-linux-egress-proof
+
+on:
+  push:
+    branches:
+      - ores-proc-linux-egress-proof-20260926
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install isolation dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap slirp4netns iproute2 iptables curl util-linux
+          bash -n proof/ores-proc-isolate.sh
+
+      - name: Prove Internet egress and host isolation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          chmod +x proof/ores-proc-isolate.sh
+
+          HOST_IP="$(ip -o -4 addr show scope global | awk 'NR==1 {split($4,a,"/"); print a[1]}')"
+          test -n "$HOST_IP"
+
+          python3 -m http.server 18080 --bind 0.0.0.0 >"$RUNNER_TEMP/host-http.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 50); do
+            curl -fsS "http://127.0.0.1:18080/" >/dev/null && break
+            sleep 0.1
+          done
+
+          proof/ores-proc-isolate.sh             --exe /usr/bin/curl             --network external             --deny-loopback             --deny-private             -- --fail --silent --show-error --max-time 10 https://example.com/ >/dev/null
+
+          if proof/ores-proc-isolate.sh             --exe /usr/bin/curl             --network external             --deny-loopback             --deny-private             -- --fail --silent --max-time 3 http://127.0.0.1:18080/ >/dev/null 2>&1; then
+            echo "sandbox unexpectedly reached host loopback" >&2
+            exit 1
+          fi
+
+          if proof/ores-proc-isolate.sh             --exe /usr/bin/curl             --network external             --deny-loopback             --deny-private             -- --fail --silent --max-time 3 "http://$HOST_IP:18080/" >/dev/null 2>&1; then
+            echo "sandbox unexpectedly reached host interface $HOST_IP" >&2
+            exit 1
+          fi
+
+      - name: Prove nested user namespaces remain disabled
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if proof/ores-proc-isolate.sh             --exe /usr/bin/unshare             --network external             --deny-loopback             --deny-private             -- --user --map-root-user /usr/bin/true; then
+            echo "nested user namespace unexpectedly succeeded" >&2
+            exit 1
+          fi
+
+      - name: Prove network helper failure kills tenant
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          set +e
+          proof/ores-proc-isolate.sh             --exe /usr/bin/sleep             --network external             --deny-loopback             --deny-private             -- 30 >"$RUNNER_TEMP/sandbox.out" 2>"$RUNNER_TEMP/sandbox.err" &
+          WRAPPER_PID=$!
+          set -e
+
+          SLIRP_PID=""
+          for _ in $(seq 1 100); do
+            SLIRP_PID="$(pgrep -P "$WRAPPER_PID" -x slirp4netns || true)"
+            if [ -n "$SLIRP_PID" ]; then
+              break
+            fi
+            if ! kill -0 "$WRAPPER_PID" 2>/dev/null; then
+              cat "$RUNNER_TEMP/sandbox.err" >&2 || true
+              echo "wrapper exited before slirp was observed" >&2
+              exit 1
+            fi
+            sleep 0.1
+          done
+          test -n "$SLIRP_PID"
+          kill "$SLIRP_PID"
+
+          set +e
+          wait "$WRAPPER_PID"
+          RC=$?
+          set -e
+          cat "$RUNNER_TEMP/sandbox.err" >&2 || true
+          test "$RC" -eq 125
+          grep -q "network helper exited while tenant was still running" "$RUNNER_TEMP/sandbox.err"
+          ! pgrep -P "$WRAPPER_PID" >/dev/null 2>&1 || {
+            echo "child process survived wrapper failure" >&2
+            exit 1
+          }
