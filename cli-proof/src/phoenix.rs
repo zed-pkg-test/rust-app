@@ -2,7 +2,9 @@ use anyhow::{bail, Context, Result};
 use serde::Serialize;
 use std::{
     collections::BTreeSet,
-    env, fs,
+    env,
+    ffi::OsString,
+    fs,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -59,6 +61,77 @@ pub struct PhoenixPlanOptions {
     pub endpoint: Option<String>,
     pub socket_paths: Vec<String>,
     pub output: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PhoenixPackageOptions {
+    pub release_dir: PathBuf,
+    pub out_dir: PathBuf,
+    pub app: String,
+    pub version: String,
+    pub router: String,
+    pub endpoint: String,
+    pub route_plan: PathBuf,
+    pub source_sha256: String,
+    pub builder_image_digest: String,
+    pub signing_key: Option<PathBuf>,
+    pub key_id: Option<String>,
+    pub unsigned: bool,
+}
+
+pub fn package(options: PhoenixPackageOptions) -> Result<()> {
+    let compiler = env::var("BMSCL_COMPILER").unwrap_or_else(|_| "bmscl-compiler".into());
+    let args = package_args(&options)?;
+    let status = Command::new(&compiler)
+        .args(&args)
+        .status()
+        .with_context(|| format!("launch {compiler} phoenix-package"))?;
+    if !status.success() {
+        bail!("{compiler} phoenix-package failed with {status}");
+    }
+    Ok(())
+}
+
+fn package_args(options: &PhoenixPackageOptions) -> Result<Vec<OsString>> {
+    if options.unsigned && (options.signing_key.is_some() || options.key_id.is_some()) {
+        bail!("--unsigned cannot be combined with --signing-key or --key-id");
+    }
+    if !options.unsigned && (options.signing_key.is_none() || options.key_id.is_none()) {
+        bail!(
+            "production Phoenix package requires --signing-key and --key-id; use --unsigned only for local development"
+        );
+    }
+
+    let mut args = vec![
+        OsString::from("phoenix-package"),
+        OsString::from("--release-dir"),
+        options.release_dir.as_os_str().to_owned(),
+        OsString::from("--out-dir"),
+        options.out_dir.as_os_str().to_owned(),
+        OsString::from("--app"),
+        OsString::from(&options.app),
+        OsString::from("--version"),
+        OsString::from(&options.version),
+        OsString::from("--router"),
+        OsString::from(&options.router),
+        OsString::from("--endpoint"),
+        OsString::from(&options.endpoint),
+        OsString::from("--route-plan"),
+        options.route_plan.as_os_str().to_owned(),
+        OsString::from("--source-sha256"),
+        OsString::from(&options.source_sha256),
+        OsString::from("--builder-image-digest"),
+        OsString::from(&options.builder_image_digest),
+    ];
+    if let (Some(signing_key), Some(key_id)) =
+        (options.signing_key.as_deref(), options.key_id.as_deref())
+    {
+        args.push(OsString::from("--signing-key"));
+        args.push(signing_key.as_os_str().to_owned());
+        args.push(OsString::from("--key-id"));
+        args.push(OsString::from(key_id));
+    }
+    Ok(args)
 }
 
 #[derive(Debug, Serialize)]
@@ -323,6 +396,48 @@ fn absolute_path(path: &Path) -> Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn package_options() -> PhoenixPackageOptions {
+        PhoenixPackageOptions {
+            release_dir: PathBuf::from("_build/prod/rel/demo"),
+            out_dir: PathBuf::from("dist-phoenix"),
+            app: "demo".into(),
+            version: "0.1.0".into(),
+            router: "DemoWeb.Router".into(),
+            endpoint: "DemoWeb.Endpoint".into(),
+            route_plan: PathBuf::from("dist/phoenix-routes.json"),
+            source_sha256: "a".repeat(64),
+            builder_image_digest: format!("sha256:{}", "b".repeat(64)),
+            signing_key: Some(PathBuf::from("customer-key.hex")),
+            key_id: Some("customer-q3".into()),
+            unsigned: false,
+        }
+    }
+
+    #[test]
+    fn phoenix_package_is_signed_by_default() {
+        let args = package_args(&package_options()).unwrap();
+        assert_eq!(args[0], OsString::from("phoenix-package"));
+        assert!(args.contains(&OsString::from("--signing-key")));
+        assert!(args.contains(&OsString::from("--builder-image-digest")));
+    }
+
+    #[test]
+    fn phoenix_package_unsigned_is_explicit() {
+        let mut options = package_options();
+        options.signing_key = None;
+        options.key_id = None;
+        assert!(package_args(&options).is_err());
+        options.unsigned = true;
+        assert!(package_args(&options).is_ok());
+    }
+
+    #[test]
+    fn phoenix_package_rejects_ambiguous_signing_mode() {
+        let mut options = package_options();
+        options.unsigned = true;
+        assert!(package_args(&options).is_err());
+    }
 
     #[test]
     fn parses_request_routes() {
