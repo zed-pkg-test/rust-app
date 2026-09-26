@@ -88,10 +88,10 @@ struct InvokeRequest {
     timeout_ms: u64,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
 const MAX_CRITICAL_SECTION_SEQUENCE: u64 = 9_007_199_254_740_991;
 
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 enum CriticalSectionOperation {
     Acquire,
     Renew,
