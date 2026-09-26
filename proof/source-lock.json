@@ -1,0 +1,9 @@
+{
+  "schema_version": "bmscl-critical-section-proof.v1",
+  "sources": {
+    "beamscale/bmscl-api-server.rs": "0568e1076caea69ecf21176f01640503dba7d30c",
+    "beamscale/bmscl-infra": "ba3ba3dd7a8e01528ec3c175d24aaa60d423845d",
+    "beamscale/bmscl-supervisor": "19c416e5cda1b7807b89703cfffa9e6126614581",
+    "beamscale/bmscl-interfaces": "90baedea4e3710761eeb03ef6c8da0d89b2ceb92"
+  }
+}
