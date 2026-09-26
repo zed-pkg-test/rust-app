@@ -1,9 +1,7 @@
 name: ores-compose current exact-head proof
 
 on:
-  push:
-    branches:
-      - proof/ores-compose-187-191-current
+  pull_request:
 
 permissions:
   contents: read
