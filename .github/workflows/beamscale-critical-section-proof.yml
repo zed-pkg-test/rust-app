@@ -1,0 +1,47 @@
+name: beamscale-critical-section-proof
+
+on:
+  push:
+    branches:
+      - beamscale-critical-section-proof-20260926
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Validate source lock
+        run: |
+          python3 - <<'PY'
+          import json, re
+          lock=json.load(open("proof/source-lock.json"))
+          for repo,sha in lock["sources"].items():
+              assert re.fullmatch(r"[0-9a-f]{40}",sha), (repo,sha)
+          print("PASS immutable source lock")
+          PY
+
+      - name: Compile and run exact-head contract assertion
+        run: |
+          rustc --edition=2021 -D warnings proof/assert_contract.rs -o /tmp/assert-contract
+          /tmp/assert-contract
+
+      - name: Compile and exhaust bounded critical-section model
+        run: |
+          rustc --edition=2021 -D warnings proof/supervisor/conformance/critical_section_formal_model.rs -o /tmp/critical-section-formal-model
+          /tmp/critical-section-formal-model
+
+      - name: Prove request-id only applies to acquire
+        run: |
+          grep -q 'request_id' proof/interfaces/typespec/main.tsp
+          grep -q 'request_id' proof/infra/modules/tenant_runtime/runtime-host/src/main.rs
+          grep -q 'request_id' proof/supervisor/src/bmscl_critical_section_actor.erl
+          grep -q 'request_id' proof/api/src/main.rs
