@@ -1,0 +1,45 @@
+name: beamscale-critical-section-stack-proof
+
+on:
+  push:
+    branches:
+      - beamscale-critical-section-stack-proof-20260925
+
+permissions:
+  contents: read
+
+jobs:
+  rust-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: API server exact-head checks
+        run: |
+          cargo fmt --manifest-path api-proof/Cargo.toml --all -- --check
+          cargo clippy --manifest-path api-proof/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path api-proof/Cargo.toml --all-targets
+      - name: Runtime-host exact-head checks
+        run: |
+          cargo fmt --manifest-path infra-proof/modules/tenant_runtime/runtime-host/Cargo.toml --all -- --check
+          cargo clippy --manifest-path infra-proof/modules/tenant_runtime/runtime-host/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path infra-proof/modules/tenant_runtime/runtime-host/Cargo.toml --all-targets
+      - name: Interface request identity checks
+        working-directory: interfaces-proof
+        run: |
+          npm install --ignore-scripts
+          npx tsp compile typespec/main.tsp
+          node - <<'NODE'
+          const fs=require('fs');
+          const s=JSON.parse(fs.readFileSync('schema/critical-section-operations.schema.json','utf8'));
+          const text=JSON.stringify(s);
+          if(!text.includes('request_id')) throw new Error('request_id missing from JSON Schema');
+          const tsp=fs.readFileSync('typespec/main.tsp','utf8');
+          if(!tsp.includes('request_id')) throw new Error('request_id missing from TypeSpec');
+          console.log('PASS interfaces request_id contract');
+          NODE
