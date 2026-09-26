@@ -102,6 +102,29 @@ impl ArtifactManifest {
             return Err(ManifestError::Capability);
         }
 
+        let actual = self
+            .capabilities
+            .iter()
+            .filter_map(|grant| hosted_capability_from_grant_name(&grant.name))
+            .collect::<HashSet<_>>();
+        let required = match self.profile.as_str() {
+            HOSTED_PROFILE_V2 | DURABLE_ACTOR_PROFILE_V1 | ERLANG_CRITICAL_SECTION_PROFILE_V1 => {
+                HashSet::from([HostedCapability::ClusterCall, HostedCapability::Log])
+            }
+            HOSTED_PROFILE_V3_HTTP => HashSet::from([
+                HostedCapability::ClusterCall,
+                HostedCapability::Http,
+                HostedCapability::Log,
+            ]),
+            // Legacy v1 is dev-only compatibility. Keep its old capability
+            // shape readable without widening any current production profile.
+            HOSTED_PROFILE_V1 => actual.clone(),
+            _ => unreachable!("profile was validated above"),
+        };
+        if actual != required {
+            return Err(ManifestError::Capability);
+        }
+
         // Hosted Gleam owns exactly one BEAM process per admitted invocation.
         // Trusted runtime processes (supervisors, pools, telemetry, routing) are
         // platform-owned and are not counted in this tenant limit.
@@ -416,10 +439,23 @@ mod tests {
     }
 
     #[test]
-    fn rejects_undeclared_hosted_capability_names() {
+    fn v2_rejects_http_capability_widening() {
         let mut manifest = valid_manifest();
         manifest.capabilities.push(CapabilityGrant {
             name: "ctx.http".into(),
+            scope: None,
+        });
+        assert_eq!(
+            manifest.validate_shared_tier(),
+            Err(ManifestError::Capability)
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_hosted_capability_names() {
+        let mut manifest = valid_manifest();
+        manifest.capabilities.push(CapabilityGrant {
+            name: "ctx.secrets".into(),
             scope: None,
         });
         assert_eq!(
