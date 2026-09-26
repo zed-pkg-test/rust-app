@@ -1,3 +1,5 @@
+//! Contract tests for Linux external-network helper liveness supervision.
+
 const HELPER: &str = include_str!("../scripts/linux/ores-proc-isolate.sh");
 
 #[test]

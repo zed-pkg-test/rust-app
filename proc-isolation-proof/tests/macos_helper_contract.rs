@@ -38,7 +38,6 @@ fn macos_helper_keeps_keychain_services_denied() {
     assert!(HELPER.contains("com.apple.ocspd"));
 }
 
-
 #[test]
 fn macos_helper_allows_only_system_tls_configuration() {
     assert!(HELPER.contains(r#"(subpath "/private/etc/ssl")"#));

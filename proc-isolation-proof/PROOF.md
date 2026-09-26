@@ -2,6 +2,6 @@
 
 Source: `ORESoftware/ores-proc-isolation-cli#13`
 
-Source head: `ddd1ef79ccd4c7ad18567851096f617960883844`
+Source head: `0909bd6dd94685488a27d3328c7454c0b8fc0e02`
 
 `proof-source.json` records the Git blob identity for every vendored source/test file. CI verifies those hashes before executing the Linux/macOS proof.
