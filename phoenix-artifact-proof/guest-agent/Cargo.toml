@@ -1,0 +1,19 @@
+[package]
+name = "bmscl-guest-agent"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+flate2 = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tar = "0.4"
+tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread"] }
+tokio-vsock = "0.7.2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+tempfile = "3"
