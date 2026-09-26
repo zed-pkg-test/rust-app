@@ -1,0 +1,149 @@
+name: ores-proc-isolation-pr13-proof
+
+on:
+  push:
+    branches: [ores-proc-isolation-pr13-proof-20260925]
+
+permissions:
+  contents: read
+
+jobs:
+  exact-head:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: proc-isolation-proof
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: 1.88.0
+          components: rustfmt, clippy
+      - name: Verify exact source blobs
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          manifest=json.loads(Path("proof-source.json").read_text())
+          assert manifest["sourceCommit"] == "ddd1ef79ccd4c7ad18567851096f617960883844"
+          for path, expected in manifest["files"].items():
+              actual=subprocess.check_output(["git","hash-object",path], text=True).strip()
+              if actual != expected:
+                  raise SystemExit(f"{path}: expected {expected} got {actual}")
+          print(f"exact blob proof OK: {len(manifest['files'])} files")
+          PY
+      - name: Install Linux helpers
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apparmor-profiles apparmor-utils bubblewrap slirp4netns iproute2 iptables shellcheck curl
+          if [[ "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || printf '0')" == '1' ]]; then
+            profile=/usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+            test -f "$profile"
+            sudo install -m 0644 "$profile" /etc/apparmor.d/bwrap-userns-restrict
+            sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
+          fi
+      - name: Static and Rust checks
+        shell: bash
+        run: |
+          bash -n scripts/linux/ores-proc-isolate.sh
+          bash -n scripts/macos/ores-proc-isolate.sh
+          if [[ "${RUNNER_OS}" == Linux ]]; then
+            shellcheck scripts/linux/ores-proc-isolate.sh scripts/macos/ores-proc-isolate.sh
+          fi
+          cargo fmt --all -- --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test --all-targets
+          cargo run --quiet -- check --config .ores-proc-isolation.yaml
+      - name: Linux backend and smoke
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          cargo run --quiet -- doctor --config .ores-proc-isolation.yaml
+          cargo build --quiet --examples --bins
+          cat > /tmp/ores-pi-smoke.yaml <<'YAML'
+          version: 1
+          defaults:
+            group: no-net
+          groups:
+            no-net:
+              network:
+                mode: none
+            external:
+              network:
+                mode: external
+                deny_loopback: true
+                deny_private_networks: true
+          processes:
+            true:
+              group: no-net
+              command: [/usr/bin/true]
+            passwd:
+              group: no-net
+              command: [/usr/bin/cat, /etc/passwd]
+            internet:
+              group: external
+              command: [/usr/bin/curl, --fail, --silent, --show-error, --head, https://example.com]
+            curl-flex:
+              group: external
+              command: [/usr/bin/curl, --fail, --silent, --show-error]
+          YAML
+          target/debug/ores-proc-isolation run true --config /tmp/ores-pi-smoke.yaml
+          if target/debug/ores-proc-isolation run passwd --config /tmp/ores-pi-smoke.yaml; then
+            echo "sandbox unexpectedly read /etc/passwd" >&2; exit 1
+          fi
+          target/debug/ores-proc-isolation run internet --config /tmp/ores-pi-smoke.yaml
+          target/debug/examples/loopback_fixture 127.0.0.1:18080 >/tmp/ores-pi-http.log 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          sleep 1
+          curl --fail --silent http://127.0.0.1:18080 >/dev/null
+          if target/debug/ores-proc-isolation run curl-flex --config /tmp/ores-pi-smoke.yaml -- http://127.0.0.1:18080; then
+            echo "sandbox unexpectedly reached host loopback" >&2; exit 1
+          fi
+      - name: macOS backend and local-development smoke
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet -- doctor --config .ores-proc-isolation.yaml
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          cargo build --quiet --examples --bins
+          cat > /tmp/ores-pi-smoke.yaml <<'YAML'
+          version: 1
+          defaults:
+            group: local-dev
+          groups:
+            local-dev:
+              filesystem:
+                read_only: [/usr/bin, /bin]
+                read_write: [/tmp/ores-pi-workspace]
+              network:
+                mode: local
+                deny_loopback: false
+                deny_private_networks: false
+          processes:
+            identity:
+              group: local-dev
+              command: [/usr/bin/id, -u]
+            local-writer:
+              group: local-dev
+              command: [/bin/sh, -c, "printf allowed > inside.txt"]
+              working_directory: /tmp/ores-pi-workspace
+          YAML
+          rm -rf /tmp/ores-pi-workspace && mkdir -p /tmp/ores-pi-workspace
+          actual=$(target/debug/ores-proc-isolation run identity --config /tmp/ores-pi-smoke.yaml)
+          test "$actual" = "$(id -u)"
+          target/debug/ores-proc-isolation run local-writer --config /tmp/ores-pi-smoke.yaml
+          test "$(cat /tmp/ores-pi-workspace/inside.txt)" = allowed
