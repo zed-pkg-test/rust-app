@@ -37,6 +37,8 @@ jobs:
       - name: Test Gleam public SDK contract
         working-directory: certification/beamscale-context-abi/gleam
         run: |
-          gleam format --check src
+          gleam format src
+          git diff -- src
+          git diff --exit-code -- src
           gleam check --target erlang
           gleam build --target erlang
