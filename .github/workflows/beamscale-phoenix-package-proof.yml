@@ -74,7 +74,7 @@ jobs:
           assert m["endpoint"]=="BmsclPhoenixFixtureWeb.Endpoint"
           assert (root/"route-plan.json").is_file()
           assert (root/"release/bin/bmscl_phoenix_fixture").is_file()
-          assert (root/"worker.tar.gz").is_file()
+          assert (root/"phoenix-release.tar.gz").is_file()
           assert (root/"attestation.json").is_file()
           print("PASS signed Phoenix release",m["build_sha256"])
           PY
