@@ -16,8 +16,8 @@ pub mod dpm;
 pub use module_contract::{
     assert_lambda_entrypoint, assert_module_export, descriptor_for, CancellationModel, Capability,
     ConcurrencyModel, ExecutionProfile, InvocationContext, InvocationMode, IsolationRequirement,
-    LambdaEntrypoint, ModuleContext, ModuleContractError, ModuleDescriptor, ModuleExport, ModuleKind,
-    CONTEXT_ABI_V1, MODULE_CONTRACT_V1, MODULE_SEMANTICS_V2,
+    LambdaEntrypoint, ModuleContext, ModuleContractError, ModuleDescriptor, ModuleExport,
+    ModuleKind, CONTEXT_ABI_V1, MODULE_CONTRACT_V1, MODULE_SEMANTICS_V2,
 };
 
 #[cfg(feature = "write")]
