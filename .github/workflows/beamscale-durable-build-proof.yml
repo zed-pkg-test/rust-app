@@ -6,7 +6,7 @@ on:
       - beamscale-durable-build-proof-20260925
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   proof:
@@ -15,59 +15,76 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          persist-credentials: true
+          persist-credentials: false
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124
         with:
           otp-version: "27.3"
-          gleam-version: "1.12.0"
+          gleam-version: "1.18.1"
           rebar3-version: "3.24.0"
           version-type: strict
-      - name: Format vendored compiler PR head
-        run: |
-          cargo fmt --manifest-path compiler-proof/Cargo.toml --all
-          if ! git diff --quiet -- compiler-proof; then
-            git config user.name "beamscale-proof-bot"
-            git config user.email "beamscale-proof-bot@users.noreply.github.com"
-            git add compiler-proof
-            git commit -m "proof: rustfmt compiler PR head"
-            git pull --rebase origin "$GITHUB_REF_NAME"
-            git push
-          fi
-      - name: Check compiler PR head
+
+      - name: Compiler checks
         run: |
           cargo fmt --manifest-path compiler-proof/Cargo.toml --all -- --check
           cargo clippy --manifest-path compiler-proof/Cargo.toml --all-targets -- -D warnings
           cargo test --manifest-path compiler-proof/Cargo.toml --all-targets
-      - name: Package constrained Erlang worker
-        env:
-          BMSCL_BUILDER_ID: funded-proof
-          BMSCL_BUILDER_IMAGE_DIGEST: sha256:1111111111111111111111111111111111111111111111111111111111111111
-          BMSCL_COMPILER_REVISION: "751d62ddab5879002660511226d20d77bdfb918b"
-        run: |
-          cargo run --manifest-path compiler-proof/Cargo.toml -- package-erlang-critical             compiler-proof/fixtures/critical_erlang             --policy compiler-proof/bmscl-policy.toml             --out-dir compiler-proof/target/proof-erlang
-          test -f compiler-proof/target/proof-erlang/beam/worker.beam
-          test -f compiler-proof/target/proof-erlang/worker.tar.gz
-          grep -q '"language": "erlang"' compiler-proof/target/proof-erlang/manifest.json
-          grep -q '"profile": "bmscl-critical-section-erlang-v1"' compiler-proof/target/proof-erlang/manifest.json
-      - name: Check CLI PR head
+          cargo build --manifest-path compiler-proof/Cargo.toml
+
+      - name: CLI checks
         run: |
           cargo fmt --manifest-path cli-proof/Cargo.toml --all -- --check
           cargo clippy --manifest-path cli-proof/Cargo.toml --all-targets -- -D warnings
           cargo test --manifest-path cli-proof/Cargo.toml --all-targets
-      - name: Prove config-driven Durable Object build
+          cargo build --manifest-path cli-proof/Cargo.toml
+
+      - name: Direct Erlang critical-section package
         env:
-          BMSCL_COMPILER: ${{ github.workspace }}/compiler-proof/target/debug/bmscl-compiler
-          BMSCL_BUILDER_ID: funded-proof
+          BMSCL_BUILDER_ID: zed-pkg-test-proof
           BMSCL_BUILDER_IMAGE_DIGEST: sha256:1111111111111111111111111111111111111111111111111111111111111111
           BMSCL_COMPILER_REVISION: "751d62ddab5879002660511226d20d77bdfb918b"
         run: |
-          cargo build --manifest-path cli-proof/Cargo.toml
-          cli-proof/target/debug/bmscl durable-objects build             --config cli-proof/.bmscl-durable-objects.toml             --unsigned
-          test -f cli-proof/dist-critical/manifest.json
-          test -f cli-proof/dist-critical/worker.tar.gz
-          grep -q '"language": "erlang"' cli-proof/dist-critical/manifest.json
-          grep -q '"profile": "bmscl-critical-section-erlang-v1"' cli-proof/dist-critical/manifest.json
-          cli-proof/target/debug/bmscl durable-objects deploy             --config cli-proof/.bmscl-durable-objects.toml             --dry-run
+          KEY="$RUNNER_TEMP/customer-key.hex"
+          printf '%064d\n' 1 > "$KEY"
+          cargo run --manifest-path compiler-proof/Cargo.toml --             package-erlang-critical compiler-proof/fixtures/critical_erlang             --policy compiler-proof/bmscl-policy.toml             --out-dir compiler-proof/target/direct-erlang-critical             --signing-key "$KEY"             --key-id proof-customer
+          python3 - <<'PY'
+          import json, pathlib
+          root=pathlib.Path("compiler-proof/target/direct-erlang-critical")
+          m=json.loads((root/"manifest.json").read_text())
+          assert m["language"]=="erlang", m
+          assert m["profile"]=="bmscl-critical-section-erlang-v1", m
+          assert len(m["build_sha256"])==64
+          assert (root/"beam/worker.beam").is_file()
+          assert (root/"worker.tar.gz").is_file()
+          assert (root/"attestation.json").is_file()
+          print("PASS direct compiler package",m["build_sha256"])
+          PY
+
+      - name: CLI config-driven Durable Object build and dry-run deploy
+        env:
+          BMSCL_COMPILER: ${{ github.workspace }}/compiler-proof/target/debug/bmscl-compiler
+          BMSCL_BUILDER_ID: zed-pkg-test-proof
+          BMSCL_BUILDER_IMAGE_DIGEST: sha256:1111111111111111111111111111111111111111111111111111111111111111
+          BMSCL_COMPILER_REVISION: "751d62ddab5879002660511226d20d77bdfb918b"
+        run: |
+          KEY="$RUNNER_TEMP/customer-key.hex"
+          printf '%064d\n' 1 > "$KEY"
+          cli-proof/target/debug/bmscl durable-objects build             --config cli-proof/.bmscl-durable-objects.toml             --signing-key "$KEY"             --key-id proof-customer
+          cli-proof/target/debug/bmscl durable-objects deploy             --config cli-proof/.bmscl-durable-objects.toml             --dry-run | tee "$RUNNER_TEMP/dry-run.txt"
+          python3 - <<'PY'
+          import json, pathlib, re
+          root=pathlib.Path("cli-proof/dist-critical")
+          m=json.loads((root/"manifest.json").read_text())
+          assert m["language"]=="erlang", m
+          assert m["profile"]=="bmscl-critical-section-erlang-v1", m
+          assert (root/"worker.tar.gz").is_file()
+          text=pathlib.Path("/tmp").glob("does-not-exist")
+          print("PASS cli durable build",m["build_sha256"])
+          PY
+          grep -q '"tenancy_class": "tenant_dedicated"' "$RUNNER_TEMP/dry-run.txt"
+          grep -q '"language": "erlang"' "$RUNNER_TEMP/dry-run.txt"
+          grep -q '"namespace": "proof-critical"' "$RUNNER_TEMP/dry-run.txt"
