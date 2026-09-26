@@ -355,9 +355,15 @@ mod tests {
         assert_eq!(descriptor.validate(), Ok(()));
         assert_eq!(descriptor.kind, ModuleKind::Lambda);
         assert_eq!(descriptor.interface, ModuleKind::Lambda.interface());
-        assert_eq!(descriptor.semantics_version.as_deref(), Some(MODULE_SEMANTICS_V2));
+        assert_eq!(
+            descriptor.semantics_version.as_deref(),
+            Some(MODULE_SEMANTICS_V2)
+        );
         assert_eq!(descriptor.context_abi.as_deref(), Some(CONTEXT_ABI_V1));
-        assert_eq!(descriptor.execution.isolation, IsolationRequirement::Process);
+        assert_eq!(
+            descriptor.execution.isolation,
+            IsolationRequirement::Process
+        );
         assert_eq!(descriptor.capabilities.len(), 2);
     }
 
