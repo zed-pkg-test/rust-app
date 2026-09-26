@@ -364,7 +364,7 @@ model CriticalSectionReleaseRequest {
 }
 
 model CriticalSectionGrant {
-  op: "critical_section_result";
+  `op`: "critical_section_result";
   operation: "acquire" | "renew";
   ok: true;
   token: CriticalSectionToken;
@@ -372,13 +372,13 @@ model CriticalSectionGrant {
 }
 
 model CriticalSectionReleased {
-  op: "critical_section_result";
+  `op`: "critical_section_result";
   operation: "release";
   ok: true;
 }
 
 model CriticalSectionRefused {
-  op: "critical_section_result";
+  `op`: "critical_section_result";
   operation: "acquire" | "renew" | "release";
   ok: false;
   error_code: string;
