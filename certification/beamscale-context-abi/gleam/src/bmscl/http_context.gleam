@@ -1,5 +1,6 @@
 import bmscl.{
-  Http, HttpClient,
+  Http,
+  HttpClient,
   type ClusterCapability,
   type HostedCapability,
   type LogCapability,
