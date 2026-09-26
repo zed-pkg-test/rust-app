@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beamscale.dev/schema/host-security-incident-receipt.schema.json",
+  "title": "BeamScale host security incident receipt",
+  "description": "Durable control-plane acknowledgment for a host-authenticated contained incident.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "incident_id",
+    "body_sha256",
+    "host_id",
+    "received_unix_seconds",
+    "user_id",
+    "tenant_id",
+    "deployment_id",
+    "runtime_id",
+    "security_state",
+    "notification_state",
+    "duplicate"
+  ],
+  "properties": {
+    "incident_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9._:@+-]+$"
+    },
+    "body_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "host_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "received_unix_seconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "user_id": {"$ref": "#/$defs/subject_id"},
+    "tenant_id": {"$ref": "#/$defs/subject_id"},
+    "deployment_id": {"$ref": "#/$defs/subject_id"},
+    "runtime_id": {"$ref": "#/$defs/subject_id"},
+    "security_state": {
+      "const": "blocked"
+    },
+    "notification_state": {
+      "const": "alert_pending"
+    },
+    "duplicate": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "subject_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9._:@+-]+$"
+    }
+  }
+}

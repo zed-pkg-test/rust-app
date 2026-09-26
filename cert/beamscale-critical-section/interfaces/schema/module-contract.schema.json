@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beamscale.dev/schema/module-contract.schema.json",
+  "title": "BeamScale User Module Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "context_abi",
+    "kind",
+    "name",
+    "entrypoint",
+    "execution",
+    "capabilities"
+  ],
+  "properties": {
+    "contract_version": { "const": "bmscl-module-contract-v1" },
+    "context_abi": { "const": "bmscl.context/v1" },
+    "semantics_version": { "const": "bmscl.module-semantics/v2" },
+    "kind": {
+      "enum": ["lambda", "http", "rpc", "actor", "worker"]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "entrypoint": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_./-]+:[A-Za-z0-9_.-]+/[1-9][0-9]*$"
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["invocation", "concurrency", "cancellation"],
+      "properties": {
+        "invocation": {
+          "enum": ["request_response", "mailbox", "event"]
+        },
+        "concurrency": {
+          "enum": ["isolated_invocation", "serialized_actor"]
+        },
+        "cancellation": {
+          "enum": ["deadline", "cooperative"]
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": ["cluster_call", "log"]
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "actor" } }, "required": ["kind"] },
+      "then": {
+        "properties": {
+          "execution": {
+            "allOf": [
+              { "properties": { "invocation": { "const": "mailbox" } } },
+              { "properties": { "concurrency": { "const": "serialized_actor" } } },
+              { "properties": { "cancellation": { "const": "cooperative" } } }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "enum": ["lambda", "http", "rpc"] } }, "required": ["kind"] },
+      "then": {
+        "properties": {
+          "execution": {
+            "allOf": [
+              { "properties": { "invocation": { "const": "request_response" } } },
+              { "properties": { "concurrency": { "const": "isolated_invocation" } } }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "worker" } }, "required": ["kind"] },
+      "then": {
+        "properties": {
+          "execution": {
+            "properties": {
+              "invocation": { "enum": ["mailbox", "event"] }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

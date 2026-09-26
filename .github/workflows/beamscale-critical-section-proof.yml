@@ -1,0 +1,132 @@
+name: BeamScale critical-section funded exact-head proof
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/beamscale-critical-section-proof.yml"
+      - "cert/beamscale-critical-section/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Verify PR40 source identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=cert/beamscale-critical-section/infra-runtime-host
+          test "$(git hash-object "$root/Cargo.toml")" = "2f13a3235f5acc68eb8bd4e90a8a194340366589"
+          test "$(git hash-object "$root/src/artifact_store.rs")" = "05484a58d4e3b9d10230ef993926053297058cb0"
+          test "$(git hash-object "$root/src/bin/bmscl-runtime-identity-writer.rs")" = "ab5a59b117f65bef4d3458d8f00146f106fbeb9f"
+          test "$(git hash-object "$root/src/lib.rs")" = "17e2fdf23f816b2333ee26027f6321df5dc6ee6b"
+          test "$(git hash-object "$root/src/main.rs")" = "9710df3812508ae87d26a7a19c2036be17506e29"
+          test "$(git hash-object "$root/src/runtime_auth.rs")" = "8d5a60f7ed5f39a7408bcd8e95286664bc9e9a9e"
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Prove exact runtime-host PR40 crate
+        run: |
+          cargo fmt --manifest-path cert/beamscale-critical-section/infra-runtime-host/Cargo.toml -- --check
+          cargo clippy --manifest-path cert/beamscale-critical-section/infra-runtime-host/Cargo.toml --all-targets --all-features -- -D warnings
+          cargo test --manifest-path cert/beamscale-critical-section/infra-runtime-host/Cargo.toml --all-targets
+
+  supervisor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Verify PR96 source identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=cert/beamscale-critical-section/supervisor
+          test "$(git hash-object "$root/conformance/critical_section_formal_model.rs")" = "883cac38f1d98aacc17f7f15d6681499eebefa17"
+          test "$(git hash-object "$root/src/bmscl_critical_section_actor.erl")" = "2905386b17430208a70a3d9a447e1d4d3ceba1f4"
+          test "$(git hash-object "$root/src/bmscl_critical_section_registry.erl")" = "64e629b14078197d2a00c950f236b7bcac7c6136"
+          test "$(git hash-object "$root/src/bmscl_critical_section_store.erl")" = "85bafff16ed945b171b12fdb24225be0db7efa2d"
+          test "$(git hash-object "$root/src/bmscl_durable_store.erl")" = "b9d2c0ee675aae185507729327cca94d1c24270e"
+          test "$(git hash-object "$root/src/bmscl_guest_control.erl")" = "9d45d0b8dc5f290e2c154c5387a112c5b4b7a6e6"
+          test "$(git hash-object "$root/src/bmscl_guest_protocol.erl")" = "b7db124a35870092f2db425c96dd9cf4483ac7df"
+          test "$(git hash-object "$root/src/bmscl_tenancy_policy.erl")" = "73384001b07a5935b8254b144967a3f54e5ceff9"
+          test "$(git hash-object "$root/test/bmscl_critical_section_persistence_tests.erl")" = "88c442f00ee5da36059a6bd0bbe82439bfc9143d"
+          test "$(git hash-object "$root/test/bmscl_critical_section_protocol_tests.erl")" = "b28c2ecc2e8c626cc4f249ae2a5e7906bd32f42c"
+          test "$(git hash-object "$root/test/bmscl_critical_section_tests.erl")" = "fe0911b2e5930035e5ef532153f409fbafad8c93"
+          test "$(git hash-object "$root/test/bmscl_test_durable_store.erl")" = "aab6eb222b2cabf5ea92e2497cdc08f9681bb60b"
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
+        with:
+          toolchain: stable
+      - name: Exhaust exact current failover model
+        run: |
+          rustc --edition=2021 -D warnings cert/beamscale-critical-section/supervisor/conformance/critical_section_formal_model.rs -o /tmp/model
+          /tmp/model
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124
+        with:
+          otp-version: "27.3"
+          rebar3-version: "3.24.0"
+      - name: Run exact current EUnit suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=cert/beamscale-critical-section/supervisor
+          tmp="$(mktemp -d)"
+          mkdir -p "$tmp/src" "$tmp/test"
+          cp "$root"/src/*.erl "$tmp/src/"
+          cp "$root"/test/*.erl "$tmp/test/"
+          cat > "$tmp/rebar.config" <<'EOF'
+          {erl_opts, [debug_info, warn_unused_import, warn_unused_vars]}.
+          {deps, [{jsx, "3.1.0"}]}.
+          {eunit_opts, [verbose]}.
+          EOF
+          cat > "$tmp/src/bmscl_supervisor.app.src" <<'EOF'
+          {application, bmscl_supervisor,
+           [{description, "critical-section certification harness"},
+            {vsn, "0.0.0"},
+            {applications, [kernel, stdlib, crypto, jsx]},
+            {env, [{critical_section_max_lease_ms, 300000}]},
+            {modules, []}]}.
+          EOF
+          cd "$tmp"
+          rebar3 eunit
+
+  interfaces:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Verify PR9 source identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=cert/beamscale-critical-section/interfaces
+          test "$(git hash-object "$root/package.json")" = "b949358d4c6a0f48ea55726f5c14eaa117635953"
+          test "$(git hash-object "$root/typespec/main.tsp")" = "24a77ff8a5f5dd3fa1aa61fd55f4b6aaa0fb9b4f"
+          test "$(git hash-object "$root/typespec/security.tsp")" = "5004133981dc282c06cb6190efb4ea217da31a4b"
+          test "$(git hash-object "$root/schema/critical-section-deployment.schema.json")" = "4656122c534324e59abab12ca517bb89028c9d7a"
+          test "$(git hash-object "$root/schema/critical-section-operations.schema.json")" = "80cf48087eb248fb929d358c10de8deb8d3e2994"
+          test "$(git hash-object "$root/schema/module-contract.schema.json")" = "7a6ee6da67cfdae4e6b3977619a9b800c53057f6"
+          test "$(git hash-object "$root/schema/tenant-runtime.schema.json")" = "a750057d82eaa639bb476d857c8c0d33f2ad389d"
+          test "$(git hash-object "$root/schema/worker-manifest.schema.json")" = "92415066abd8830671ac2af300230792ba1ddb11"
+          test "$(git hash-object "$root/tests/module-contract-parity.test.mjs")" = "ec0c0687464c914e15f9edcd8f0f0899fd866a25"
+          test "$(git hash-object "$root/tests/module-projections.test.mjs")" = "7b4e3b6e938b873cd30d9e4e5a11fdeb601d981e"
+          test "$(git hash-object "$root/module-projections/manifest.json")" = "9b7b3d895bab58731fe1d5c329d539136a617ba9"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22"
+      - name: Prove exact current interface contracts
+        working-directory: cert/beamscale-critical-section/interfaces
+        run: |
+          npm install
+          npm run check

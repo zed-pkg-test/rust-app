@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beamscale.dev/schema/critical-section-deployment.schema.json",
+  "title": "BeamScale critical-section deployment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenant_id",
+    "namespace",
+    "language",
+    "build_sha256"
+  ],
+  "properties": {
+    "deployment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "namespace": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "language": {
+      "enum": [
+        "erlang",
+        "gleam"
+      ]
+    },
+    "build_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tenancy_class": {
+      "const": "tenant_dedicated"
+    }
+  }
+}

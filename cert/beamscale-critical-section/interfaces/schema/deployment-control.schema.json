@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beamscale.dev/schema/deployment-control.schema.json",
+  "title": "BeamScale deployment control",
+  "$ref": "#/$defs/DeploymentPlanRequest",
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "project_segment": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "unit_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"
+    },
+    "git_commit": {
+      "type": "string",
+      "minLength": 7,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]+$"
+    },
+    "DeploymentUnitKind": {
+      "type": "string",
+      "enum": ["lambda", "middleware"]
+    },
+    "DeploymentUnitCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "build_sha256", "source_sha256"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/DeploymentUnitKind" },
+        "name": { "$ref": "#/$defs/unit_name" },
+        "build_sha256": { "$ref": "#/$defs/sha256" },
+        "source_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "DeploymentUnitTombstone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/DeploymentUnitKind" },
+        "name": { "$ref": "#/$defs/unit_name" }
+      }
+    },
+    "LegacyLambdaCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "build_sha256", "source_sha256"],
+      "properties": {
+        "name": { "$ref": "#/$defs/unit_name" },
+        "build_sha256": { "$ref": "#/$defs/sha256" },
+        "source_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "DeploymentPlanRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "environment"],
+      "properties": {
+        "project": { "$ref": "#/$defs/project_segment" },
+        "environment": { "$ref": "#/$defs/project_segment" },
+        "git_commit": { "$ref": "#/$defs/git_commit" },
+        "force": { "type": "boolean", "default": false },
+        "units": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": { "$ref": "#/$defs/DeploymentUnitCandidate" }
+        },
+        "tombstones": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": { "$ref": "#/$defs/DeploymentUnitTombstone" }
+        },
+        "lambdas": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": { "$ref": "#/$defs/LegacyLambdaCandidate" }
+        }
+      },
+      "anyOf": [
+        { "required": ["units"], "properties": { "units": { "minItems": 1 } } },
+        { "required": ["tombstones"], "properties": { "tombstones": { "minItems": 1 } } },
+        { "required": ["lambdas"], "properties": { "lambdas": { "minItems": 1 } } }
+      ]
+    },
+    "DeploymentApplyRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "environment", "expected_revision"],
+      "properties": {
+        "project": { "$ref": "#/$defs/project_segment" },
+        "environment": { "$ref": "#/$defs/project_segment" },
+        "git_commit": { "$ref": "#/$defs/git_commit" },
+        "force": { "type": "boolean", "default": false },
+        "expected_revision": { "type": "integer", "minimum": 0 },
+        "units": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": { "$ref": "#/$defs/DeploymentUnitCandidate" }
+        },
+        "tombstones": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": { "$ref": "#/$defs/DeploymentUnitTombstone" }
+        },
+        "lambdas": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": { "$ref": "#/$defs/LegacyLambdaCandidate" }
+        }
+      },
+      "anyOf": [
+        { "required": ["units"], "properties": { "units": { "minItems": 1 } } },
+        { "required": ["tombstones"], "properties": { "tombstones": { "minItems": 1 } } },
+        { "required": ["lambdas"], "properties": { "lambdas": { "minItems": 1 } } }
+      ]
+    },
+    "DeploymentPlanReason": {
+      "type": "string",
+      "enum": [
+        "forced",
+        "not_deployed",
+        "build_changed",
+        "artifact_missing",
+        "up_to_date",
+        "deleted",
+        "already_deleted"
+      ]
+    },
+    "PlannedDeploymentUnit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "tombstone", "artifact_present", "reason"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/DeploymentUnitKind" },
+        "name": { "$ref": "#/$defs/unit_name" },
+        "tombstone": { "type": "boolean" },
+        "build_sha256": { "$ref": "#/$defs/sha256" },
+        "source_sha256": { "$ref": "#/$defs/sha256" },
+        "current_build_sha256": { "$ref": "#/$defs/sha256" },
+        "artifact_present": { "type": "boolean" },
+        "reason": { "$ref": "#/$defs/DeploymentPlanReason" }
+      }
+    },
+    "DeploymentPlanResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "environment", "revision", "changed", "unchanged"],
+      "properties": {
+        "project": { "$ref": "#/$defs/project_segment" },
+        "environment": { "$ref": "#/$defs/project_segment" },
+        "revision": { "type": "integer", "minimum": 0 },
+        "changed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PlannedDeploymentUnit" }
+        },
+        "unchanged": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PlannedDeploymentUnit" }
+        }
+      }
+    },
+    "DeploymentApplyResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "environment", "previous_revision", "revision", "applied", "unchanged"],
+      "properties": {
+        "project": { "$ref": "#/$defs/project_segment" },
+        "environment": { "$ref": "#/$defs/project_segment" },
+        "previous_revision": { "type": "integer", "minimum": 0 },
+        "revision": { "type": "integer", "minimum": 0 },
+        "applied": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PlannedDeploymentUnit" }
+        },
+        "unchanged": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PlannedDeploymentUnit" }
+        }
+      }
+    },
+    "DeploymentTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "build_sha256", "source_sha256", "updated_unix_seconds", "activation_state"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/DeploymentUnitKind" },
+        "name": { "$ref": "#/$defs/unit_name" },
+        "build_sha256": { "$ref": "#/$defs/sha256" },
+        "source_sha256": { "$ref": "#/$defs/sha256" },
+        "git_commit": { "$ref": "#/$defs/git_commit" },
+        "updated_unix_seconds": { "type": "integer", "minimum": 0 },
+        "activation_state": { "type": "string" }
+      }
+    },
+    "DeploymentTombstoneRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "updated_unix_seconds", "activation_state"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/DeploymentUnitKind" },
+        "name": { "$ref": "#/$defs/unit_name" },
+        "git_commit": { "$ref": "#/$defs/git_commit" },
+        "updated_unix_seconds": { "type": "integer", "minimum": 0 },
+        "activation_state": { "type": "string" }
+      }
+    },
+    "DeploymentTargetState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format_version", "project", "environment", "revision", "lambdas", "middleware", "tombstones"],
+      "properties": {
+        "format_version": { "const": 1 },
+        "project": { "$ref": "#/$defs/project_segment" },
+        "environment": { "$ref": "#/$defs/project_segment" },
+        "revision": { "type": "integer", "minimum": 0 },
+        "lambdas": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/DeploymentTarget" }
+        },
+        "middleware": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/DeploymentTarget" }
+        },
+        "tombstones": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/DeploymentTombstoneRecord" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "version": "bmscl.module-projections/v1",
+  "runtime_family": "beam",
+  "rules": {
+    "direct_guest_languages": ["erlang", "gleam"],
+    "non_beam_projection_does_not_imply_guest_support": true,
+    "capabilities_are_runtime_grants_not_imports": true
+  },
+  "languages": [
+    {
+      "id": "erlang",
+      "role": "direct_guest",
+      "strategy": "behaviour_callbacks",
+      "enforcement": "compiler_plus_static_analysis",
+      "example": "module-projections/erlang/example_module.erl"
+    },
+    {
+      "id": "gleam",
+      "role": "direct_guest",
+      "strategy": "opaque_typed_export",
+      "enforcement": "compile_time",
+      "example": "module-projections/gleam/module_contract.gleam"
+    },
+    {
+      "id": "rust",
+      "role": "control_plane_sdk_only",
+      "strategy": "trait_impl",
+      "enforcement": "compile_time"
+    },
+    {
+      "id": "typescript",
+      "role": "control_plane_sdk_only",
+      "strategy": "satisfies_export_object",
+      "enforcement": "compile_time"
+    },
+    {
+      "id": "wit",
+      "role": "interop_metadata_only",
+      "strategy": "component_interface",
+      "enforcement": "component_link_time"
+    }
+  ]
+}

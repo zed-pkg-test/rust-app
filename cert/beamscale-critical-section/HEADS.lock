@@ -1,0 +1,7 @@
+beamscale/bmscl-infra#40=ba3ba3dd7a8e01528ec3c175d24aaa60d423845d
+beamscale/bmscl-supervisor#96=19c416e5cda1b7807b89703cfffa9e6126614581
+beamscale/bmscl-interfaces#9=90baedea4e3710761eeb03ef6c8da0d89b2ceb92
+source_harness=scintilla-run-test/gleam-lambda-runner-e2e@cert/beamscale-critical-section-chain-20260925
+runtime_main_blob=9710df3812508ae87d26a7a19c2036be17506e29
+supervisor_formal_model_blob=883cac38f1d98aacc17f7f15d6681499eebefa17
+interfaces_typespec_main_blob=24a77ff8a5f5dd3fa1aa61fd55f4b6aaa0fb9b4f

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beamscale.dev/schema/worker-manifest.schema.json",
+  "title": "BeamScale Worker Artifact Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format_version",
+    "runtime",
+    "language",
+    "profile",
+    "source_sha256",
+    "build_sha256",
+    "entrypoint",
+    "capabilities",
+    "runtime_limits"
+  ],
+  "properties": {
+    "format_version": { "const": 1 },
+    "runtime": { "const": "beam" },
+    "language": { "const": "gleam" },
+    "profile": { "type": "string", "minLength": 1 },
+    "source_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "build_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "entrypoint": { "type": "string", "pattern": "^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*/[0-9]+$" },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^ctx\\.[a-z][a-z0-9_.-]*$" },
+          "scope": {}
+        }
+      }
+    },
+    "runtime_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_wall_ms", "max_reductions", "max_heap_bytes", "max_processes"],
+      "properties": {
+        "max_wall_ms": { "type": "integer", "minimum": 1, "maximum": 300000 },
+        "max_reductions": { "type": "integer", "minimum": 1 },
+        "max_heap_bytes": { "type": "integer", "minimum": 1048576 },
+        "max_processes": { "const": 1, "description": "Exactly one tenant-owned BEAM process exists per invocation; child concurrency is expressed as additional HTTP/cluster invocations." },
+        "max_mailbox_bytes": { "type": "integer", "minimum": 1024 },
+        "max_output_bytes": { "type": "integer", "minimum": 1 },
+        "max_outbound_requests": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
