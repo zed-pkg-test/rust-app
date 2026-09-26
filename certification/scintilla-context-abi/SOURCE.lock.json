@@ -1,0 +1,14 @@
+{
+  "schema_version": "scintilla.context-abi-cert/v1",
+  "source_head": "856b56a45821d5c1bb4c77dcd0bbdce8e5c62c51",
+  "blobs": {
+    "Cargo.toml": "9e34787f83c4f7679fc4155863bffe868e19a04e",
+    "src/capabilities.rs": "058a1b09c6cb6c16461753803f660320668f78a1",
+    "src/contracts.rs": "e1f860da03530f530d2597150efb6cd550d4a55b",
+    "src/dpm.rs": "e4dff937f60f60892e2fa5e2b537cc743f98d8ab",
+    "src/lib.rs": "a9a3ac01a2018987abb62265c2fd7d8d789bb4b5",
+    "src/module_contract.rs": "d8e1b97032103d2584f52849250d00ff8b060bad",
+    "tests/contracts.rs": "c4465d43087e614b05a60202c373d99d3157295d",
+    "tests/module_contract_fixture.rs": "3aaed141b1d9c4710ac6bf413ae12e2ff6b716b0"
+  }
+}
