@@ -323,7 +323,7 @@ enum DurableObjectLanguage {
 model CriticalSectionDeploymentRequest {
   deployment_id?: DeploymentId;
   tenant_id: TenantId;
-  namespace: string;
+  `namespace`: string;
   language: DurableObjectLanguage;
   build_sha256: Sha256;
   tenancy_class?: "tenant_dedicated";
@@ -395,7 +395,7 @@ model CriticalSectionDeployment {
   deployment_id: DeploymentId;
   user_id: string;
   tenant_id: TenantId;
-  namespace: string;
+  `namespace`: string;
   runtime: "beam";
   language: DurableObjectLanguage;
   profile: "bmscl-critical-section-v1";
