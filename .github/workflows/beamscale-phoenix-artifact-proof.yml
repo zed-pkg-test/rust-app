@@ -1,0 +1,31 @@
+name: beamscale-phoenix-artifact-proof
+
+on:
+  push:
+    branches:
+      - beamscale-phoenix-artifact-proof-20260925
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Runtime host
+        run: |
+          cargo fmt --manifest-path phoenix-artifact-proof/runtime-host/Cargo.toml --all -- --check
+          cargo clippy --manifest-path phoenix-artifact-proof/runtime-host/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path phoenix-artifact-proof/runtime-host/Cargo.toml --all-targets
+      - name: Guest agent
+        run: |
+          cargo fmt --manifest-path phoenix-artifact-proof/guest-agent/Cargo.toml --all -- --check
+          cargo clippy --manifest-path phoenix-artifact-proof/guest-agent/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path phoenix-artifact-proof/guest-agent/Cargo.toml --all-targets
