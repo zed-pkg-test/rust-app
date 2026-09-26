@@ -3,6 +3,10 @@ name: ores-proc-isolation-pr13-proof
 on:
   push:
     branches: [ores-proc-isolation-pr13-proof-20260925]
+  pull_request:
+    paths:
+      - "proc-isolation-proof/**"
+      - ".github/workflows/ores-proc-isolation-pr13-proof.yml"
 
 permissions:
   contents: read
