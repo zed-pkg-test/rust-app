@@ -1,0 +1,42 @@
+name: BeamScale context ABI exact-head certification
+
+on:
+  pull_request:
+    paths:
+      - "certification/beamscale-context-abi/**"
+      - ".github/workflows/beamscale-context-abi-cert.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  exact-head-contracts:
+    runs-on: ubuntu-latest
+    env:
+      BMSCL_LIB_CORE_HEAD: "659ae3b158a519557306b4384d1f1ab7e0e1590d"
+      BMSCL_PUB_LIB_CORE_HEAD: "086cd04b2323498fa7234db8226ee030114f459a"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "29.1.1"
+          gleam-version: "1.18.1"
+      - name: Record exact source heads
+        run: |
+          printf 'bmscl-lib-core=%s\n' "$BMSCL_LIB_CORE_HEAD"
+          printf 'bmscl-pub-lib-core=%s\n' "$BMSCL_PUB_LIB_CORE_HEAD"
+      - name: Test Rust admission contract
+        working-directory: certification/beamscale-context-abi/rust
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test --all-targets
+      - name: Test Gleam public SDK contract
+        working-directory: certification/beamscale-context-abi/gleam
+        run: |
+          gleam format --check src
+          gleam check --target erlang
+          gleam build --target erlang
