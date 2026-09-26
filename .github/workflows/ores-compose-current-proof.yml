@@ -1,0 +1,41 @@
+name: ores-compose current exact-head proof
+
+on:
+  push:
+    branches:
+      - proof/ores-compose-187-191-current
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pr: 187
+            sha: 2d5fbe9c7ef42d7112afc46f75cc184f521332f1
+          - pr: 191
+            sha: 17a5e9cf654447e6299872c383d056bcf9f1cdeb
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - name: Fetch exact ores-compose head
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --no-checkout https://github.com/ORESoftware/ores-compose.git /tmp/ores-compose
+          git -C /tmp/ores-compose fetch origin "${{ matrix.sha }}"
+          git -C /tmp/ores-compose checkout --detach "${{ matrix.sha }}"
+          test "$(git -C /tmp/ores-compose rev-parse HEAD)" = "${{ matrix.sha }}"
+      - name: Format
+        working-directory: /tmp/ores-compose
+        run: cargo fmt --all --check
+      - name: Clippy
+        working-directory: /tmp/ores-compose
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - name: Test
+        working-directory: /tmp/ores-compose
+        run: cargo test --workspace --all-targets --all-features --locked
