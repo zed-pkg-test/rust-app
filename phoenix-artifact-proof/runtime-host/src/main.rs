@@ -1674,6 +1674,7 @@ mod tests {
     #[test]
     fn artifact_response_must_ack_exact_admitted_bytes() {
         let artifact = AdmittedArtifact {
+            artifact_kind: artifact_store::ArtifactKind::BeamWorker,
             build_sha256: "d".repeat(64),
             archive_name: "worker.tar.gz".into(),
             archive_sha256: "e".repeat(64),
