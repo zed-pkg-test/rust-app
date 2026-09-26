@@ -1,0 +1,448 @@
+{
+  "schemaVersion": "ores.portfolio-governance.v1",
+  "generatedAt": "2026-09-25T00:00:00Z",
+  "coverageState": "partial",
+  "scopeNote": "Initial executable slice. Repositories known but not yet classified must be added as inspectionState=uninspected rather than omitted before coverageState can become complete.",
+  "repositories": [
+    {
+      "id": "beamscale/bmscl-compiler",
+      "observedCommit": "e1300bb973d002b7f6221b7c57da14b90ac9f782",
+      "inspectionState": "reviewed",
+      "role": "compiler",
+      "languages": [
+        "rust",
+        "erlang",
+        "gleam"
+      ],
+      "contractAuthorities": [
+        "artifact manifest",
+        "admission receipt"
+      ],
+      "releaseMechanism": "signed BEAM artifact",
+      "testRepositories": [
+        "beamscale-test/bmscl-test-e2e"
+      ],
+      "deploymentConsumers": [
+        "beamscale/bmscl-cli",
+        "beamscale/bmscl-supervisor"
+      ],
+      "dependencies": [
+        {
+          "repository": "beamscale/bmscl-pub-lib-core",
+          "kind": "contract"
+        }
+      ]
+    },
+    {
+      "id": "beamscale/bmscl-cli",
+      "observedCommit": "7a1f2706e1265c0cf3db7de723d9fbe45f5c3695",
+      "inspectionState": "reviewed",
+      "role": "cli",
+      "languages": [
+        "rust"
+      ],
+      "contractAuthorities": [
+        "provider bundle v2",
+        "Phoenix discovery v2",
+        "Durable Objects config"
+      ],
+      "releaseMechanism": "Rust CLI",
+      "testRepositories": [
+        "beamscale-test/bmscl-test-e2e"
+      ],
+      "deploymentConsumers": [],
+      "dependencies": [
+        {
+          "repository": "beamscale/bmscl-compiler",
+          "kind": "build"
+        },
+        {
+          "repository": "beamscale/bmscl-api-server.rs",
+          "kind": "deploy"
+        }
+      ]
+    },
+    {
+      "id": "beamscale/bmscl-supervisor",
+      "observedCommit": "0f69a6ea47ea297fc917991f6856ae2cffaea43c",
+      "inspectionState": "reviewed",
+      "role": "runtime",
+      "languages": [
+        "erlang"
+      ],
+      "contractAuthorities": [
+        "microVM runtime contract",
+        "execution policy",
+        "guest protocol"
+      ],
+      "releaseMechanism": "BEAM release",
+      "testRepositories": [
+        "beamscale-test/bmscl-test-e2e"
+      ],
+      "deploymentConsumers": [
+        "beamscale/bmscl-api-server.rs"
+      ],
+      "dependencies": [
+        {
+          "repository": "beamscale/bmscl-infra",
+          "kind": "runtime"
+        },
+        {
+          "repository": "beamscale/bmscl-lib-core",
+          "kind": "contract"
+        }
+      ]
+    },
+    {
+      "id": "beamscale/bmscl-infra",
+      "observedCommit": "1c7699c12f53f088b493d0a07018082bb5ce8477",
+      "inspectionState": "reviewed",
+      "role": "infra",
+      "languages": [
+        "rust",
+        "nix"
+      ],
+      "contractAuthorities": [
+        "runtime-host contract",
+        "Firecracker guest identity"
+      ],
+      "releaseMechanism": "NixOS/Colmena/OpenTofu runtime cells",
+      "testRepositories": [
+        "beamscale-test/bmscl-test-e2e"
+      ],
+      "deploymentConsumers": [
+        "beamscale/bmscl-api-server.rs"
+      ],
+      "dependencies": [
+        {
+          "repository": "beamscale/bmscl-supervisor",
+          "kind": "runtime"
+        }
+      ]
+    },
+    {
+      "id": "beamscale/bmscl-api-server.rs",
+      "observedCommit": "b5ab68b02abd04f9cd8f1848b6644d9b60acb37a",
+      "inspectionState": "reviewed",
+      "role": "control-plane",
+      "languages": [
+        "rust"
+      ],
+      "contractAuthorities": [
+        "runtime class placement",
+        "deployment admission"
+      ],
+      "releaseMechanism": "Rust service",
+      "testRepositories": [
+        "beamscale-test/bmscl-test-e2e"
+      ],
+      "deploymentConsumers": [
+        "beamscale/bmscl-cli"
+      ],
+      "dependencies": [
+        {
+          "repository": "beamscale/bmscl-infra",
+          "kind": "deploy"
+        },
+        {
+          "repository": "beamscale/bmscl-supervisor",
+          "kind": "runtime"
+        }
+      ]
+    },
+    {
+      "id": "beamscale/bmscl-pub-lib-core",
+      "observedCommit": "f684043c428dbf179bb2fb9e3f997bb366f5a939",
+      "inspectionState": "reviewed",
+      "role": "library",
+      "languages": [
+        "gleam"
+      ],
+      "contractAuthorities": [
+        "bmscl.context/v1",
+        "public module contract"
+      ],
+      "releaseMechanism": "package library",
+      "testRepositories": [],
+      "deploymentConsumers": [
+        "beamscale/bmscl-compiler"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "beamscale/bmscl-lib-core",
+      "observedCommit": "81c9338fadd172c9a922a6af1045a63127696935",
+      "inspectionState": "reviewed",
+      "role": "library",
+      "languages": [
+        "rust"
+      ],
+      "contractAuthorities": [
+        "bmscl.context/v1",
+        "ModuleDescriptor"
+      ],
+      "releaseMechanism": "Rust library",
+      "testRepositories": [],
+      "deploymentConsumers": [
+        "beamscale/bmscl-supervisor"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "ORESoftware/my-ai",
+      "observedCommit": "288a62ed2e36f80d728821742d2cb8b8e670ba17",
+      "inspectionState": "reviewed",
+      "role": "governance",
+      "languages": [
+        "rust",
+        "javascript",
+        "typespec"
+      ],
+      "contractAuthorities": [
+        "portfolio governance",
+        "formal-methods policy"
+      ],
+      "releaseMechanism": "governance repository",
+      "testRepositories": [],
+      "deploymentConsumers": [],
+      "dependencies": []
+    },
+    {
+      "id": "ORESoftware/ores-compose",
+      "observedCommit": "fbfad966f9770a9a8d3895880523280324b4ddc6",
+      "inspectionState": "reviewed",
+      "role": "orchestrator",
+      "languages": [
+        "typescript"
+      ],
+      "contractAuthorities": [
+        "compose service model"
+      ],
+      "releaseMechanism": "CLI/package",
+      "testRepositories": [],
+      "deploymentConsumers": [],
+      "dependencies": [
+        {
+          "repository": "ORESoftware/ores-proc-isolation-cli",
+          "kind": "runtime"
+        }
+      ]
+    },
+    {
+      "id": "ORESoftware/ores-proc-isolation-cli",
+      "observedCommit": "9261acc26e1285e75d005355b06bab4e478e6ae1",
+      "inspectionState": "reviewed",
+      "role": "runtime",
+      "languages": [
+        "rust"
+      ],
+      "contractAuthorities": [
+        "process isolation policy"
+      ],
+      "releaseMechanism": "CLI",
+      "testRepositories": [],
+      "deploymentConsumers": [
+        "ORESoftware/ores-compose"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": "ORESoftware/live-mutex",
+      "observedCommit": "c6515ce413070db5600632a10b82a3a1faf4cae3",
+      "inspectionState": "reviewed",
+      "role": "library",
+      "languages": [
+        "typescript",
+        "javascript"
+      ],
+      "contractAuthorities": [
+        "lock protocol"
+      ],
+      "releaseMechanism": "npm package",
+      "testRepositories": [],
+      "deploymentConsumers": [],
+      "dependencies": [
+        {
+          "repository": "ORESoftware/live-mutex-rs",
+          "kind": "cross-runtime-test"
+        }
+      ]
+    },
+    {
+      "id": "ORESoftware/live-mutex-rs",
+      "observedCommit": "9b3c1eea4c78c8a8164fb329a6dd6ce65b680bd4",
+      "inspectionState": "reviewed",
+      "role": "library",
+      "languages": [
+        "rust"
+      ],
+      "contractAuthorities": [
+        "lock protocol"
+      ],
+      "releaseMechanism": "Rust crate",
+      "testRepositories": [],
+      "deploymentConsumers": [],
+      "dependencies": [
+        {
+          "repository": "ORESoftware/live-mutex",
+          "kind": "cross-runtime-test"
+        }
+      ]
+    },
+    {
+      "id": "zed-pkg/zed-cli",
+      "observedCommit": "17412050a0f4c4f963008f0de9abf3651d42af08",
+      "inspectionState": "reviewed",
+      "role": "package-manager",
+      "languages": [
+        "rust"
+      ],
+      "contractAuthorities": [
+        "package graph",
+        "submodule coordination"
+      ],
+      "releaseMechanism": "Rust CLI",
+      "testRepositories": [],
+      "deploymentConsumers": [],
+      "dependencies": []
+    }
+  ],
+  "certifications": [
+    {
+      "receiptId": "beamscale-cli-phoenix-36169999526",
+      "sourceRepository": "beamscale/bmscl-cli",
+      "sourceCommit": "68ea3fa0177a0b738d5309729547a8a72e1aebe4",
+      "executionRepository": "zed-pkg-test/rust-app",
+      "executionCommit": "ee66ad67b6d6b33bb78a30a54a4856b4d328f384",
+      "runUrl": "https://github.com/zed-pkg-test/rust-app/actions/runs/36169999526",
+      "status": "passed",
+      "infrastructureState": "executed",
+      "commands": [
+        "cargo check --manifest-path beamscale-proof/Cargo.toml --all-targets",
+        "cargo test --manifest-path beamscale-proof/Cargo.toml"
+      ],
+      "toolchains": [
+        "rust:stable"
+      ],
+      "dependencyCommits": [],
+      "artifactDigests": []
+    },
+    {
+      "receiptId": "beamscale-microvm-contract-36154512620",
+      "sourceRepository": "beamscale/bmscl-supervisor",
+      "sourceCommit": "b7a73ce6bee7036a58fceaa2699a492fe074c6ab",
+      "executionRepository": "zed-pkg-test/erlang-app",
+      "executionCommit": "8b7d9f46da801a61f90f3d787b46563c5b61cea8",
+      "runUrl": "https://github.com/zed-pkg-test/erlang-app/actions/runs/36154512620",
+      "status": "passed",
+      "infrastructureState": "executed",
+      "commands": [
+        "erlc -Werror BeamScale experimental runtime modules/tests",
+        "EUnit experimental profile, actor, security, execution-policy and microVM-contract suites"
+      ],
+      "toolchains": [
+        "otp:27.3"
+      ],
+      "dependencyCommits": [],
+      "artifactDigests": []
+    }
+  ],
+  "formalEvidence": [
+    {
+      "claimId": "beamscale-firecracker-admission",
+      "repository": "beamscale/bmscl-supervisor",
+      "status": "verified",
+      "riskClasses": [
+        "S2"
+      ],
+      "invariants": [
+        "experimental profiles cannot fall back to bare-process execution",
+        "microVM tickets are tenant-bound",
+        "microVM tickets are operation-bound"
+      ],
+      "modelPaths": [
+        "conformance/formal_model.rs"
+      ],
+      "implementationPaths": [
+        "src/bmscl_execution_boundary.erl",
+        "src/bmscl_execution_policy.erl",
+        "src/bmscl_microvm_contract.erl"
+      ],
+      "testPaths": [
+        "test/bmscl_execution_boundary_tests.erl",
+        "test/bmscl_execution_policy_tests.erl",
+        "test/bmscl_microvm_contract_tests.erl"
+      ],
+      "assumptions": [
+        "HMAC signing secret remains outside the tenant guest"
+      ],
+      "bounds": [
+        "bounded formal model plus executable EUnit paths"
+      ],
+      "brokenImplementationTest": "test/bmscl_microvm_contract_tests.erl",
+      "evidenceReceipts": [
+        "beamscale-microvm-contract-36154512620"
+      ]
+    },
+    {
+      "claimId": "beamscale-firecracker-host-identity",
+      "repository": "beamscale/bmscl-infra",
+      "status": "partial",
+      "riskClasses": [
+        "S2"
+      ],
+      "invariants": [
+        "tenant/shard/runtime epoch identity is preserved",
+        "Firecracker is the required backend"
+      ],
+      "modelPaths": [
+        "conformance/formal_model.rs"
+      ],
+      "implementationPaths": [
+        "modules/tenant_runtime/runtime-host/src/main.rs"
+      ],
+      "testPaths": [
+        "modules/tenant_runtime/guest-agent/tests/artifact_receive.rs"
+      ],
+      "assumptions": [
+        "real KVM qualification is a separate lane"
+      ],
+      "bounds": [
+        "non-KVM contract tests do not prove hardware isolation"
+      ],
+      "brokenImplementationTest": "modules/tenant_runtime/guest-agent/tests/artifact_receive.rs",
+      "evidenceReceipts": []
+    },
+    {
+      "claimId": "beamscale-compiler-admission",
+      "repository": "beamscale/bmscl-compiler",
+      "status": "partial",
+      "riskClasses": [
+        "S1",
+        "S2"
+      ],
+      "invariants": [
+        "final BEAM admission is fail-closed",
+        "tenant process creation is restricted by profile"
+      ],
+      "modelPaths": [
+        "conformance/formal_model.rs"
+      ],
+      "implementationPaths": [
+        "src/policy.rs",
+        "src/beam_verify.rs"
+      ],
+      "testPaths": [
+        "tests/admission.rs"
+      ],
+      "assumptions": [
+        "build-time code requires isolated build infrastructure for untrusted Elixir/Erlang hooks"
+      ],
+      "bounds": [
+        "model does not establish isolation of external build workers"
+      ],
+      "brokenImplementationTest": "tests/admission.rs",
+      "evidenceReceipts": []
+    }
+  ]
+}
