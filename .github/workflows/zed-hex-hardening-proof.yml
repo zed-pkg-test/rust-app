@@ -1,0 +1,25 @@
+name: zed-hex-hardening-proof
+
+on:
+  push:
+    branches:
+      - zed-hex-hardening-proof-20260926
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: zed-pkg/zed-cli
+          ref: 9f7f1635dd830fce8e3d8dc75015d0a1734576aa
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check zed-hex
+        run: cargo check --bin zed-hex-pm --tests
+      - name: Test zed-hex
+        run: cargo test --bin zed-hex-pm
