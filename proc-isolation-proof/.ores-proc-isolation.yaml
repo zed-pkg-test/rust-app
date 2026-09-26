@@ -1,0 +1,31 @@
+version: 1
+
+defaults:
+  group: external-only
+
+groups:
+  external-only:
+    # Membership can be declared here, on the process, or both. If both are
+    # present they must agree; ambiguity fails closed.
+    members:
+      - example
+    filesystem:
+      # The host root/home are never mounted into the Linux sandbox. On macOS,
+      # Seatbelt starts deny-by-default and only grants system runtime reads,
+      # the executable, and these explicit paths.
+      read_only: []
+    network:
+      mode: external
+      deny_loopback: true
+      deny_private_networks: true
+    limits:
+      max_open_files: 128
+      cpu_seconds: 300
+    environment: {}
+
+processes:
+  example:
+    group: external-only
+    command:
+      - /usr/bin/true
+    environment: {}

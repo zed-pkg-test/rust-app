@@ -1,0 +1,58 @@
+[help]
+url = "https://github.com/ORESoftware/ores-proc-isolation-cli#usage"
+columns = ["options", "env", "type", "default", "description"]
+
+[env]
+files = []
+
+[parse]
+command_env = "ORES_PI_COMMAND"
+positionals_env = "ORES_PI_POSITIONALS"
+unknown_options_env = "ORES_PI_UNKNOWN_OPTIONS"
+errors_env = "ORES_PI_PARSE_ERRORS"
+allow_unknown = false
+
+[flags.config]
+env = "ORES_PI_CONFIG"
+aliases = ["config", "config-path"]
+short = "c"
+type = "string"
+default = ".ores-proc-isolation.yaml"
+help = "Path to the process isolation policy file."
+
+[flags.dry-run]
+env = "ORES_PI_DRY_RUN"
+aliases = ["dry-run"]
+type = "bool"
+default = "false"
+help = "Resolve and print the sandbox plan without launching the target process."
+
+[flags.json]
+env = "ORES_PI_JSON"
+aliases = ["json"]
+type = "bool"
+default = "false"
+help = "Emit machine-readable JSON for check, doctor, explain, and dry-run output."
+
+[flags.beamscale-honeypot]
+env = "ORES_PI_BEAMSCALE_HONEYPOT"
+aliases = ["beamscale-honeypot"]
+type = "bool"
+default = "false"
+help = "Enable the fixed BeamScale host escape tripwire mount/PATH contract on Linux."
+
+[commands.check]
+help = "Validate .ores-proc-isolation.yaml and all process/group mappings without launching anything."
+env = "ORES_PI_COMMAND_CHECK"
+
+[commands.doctor]
+help = "Validate configuration and report host sandbox dependencies for the current platform."
+env = "ORES_PI_COMMAND_DOCTOR"
+
+[commands.explain]
+help = "Resolve one configured process to its group and effective sandbox policy. Usage: explain <process>."
+env = "ORES_PI_COMMAND_EXPLAIN"
+
+[commands.run]
+help = "Run one configured process in the fail-closed sandbox. Usage: run <process> -- [extra args...]."
+env = "ORES_PI_COMMAND_RUN"
