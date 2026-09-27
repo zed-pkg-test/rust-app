@@ -17,23 +17,41 @@ jobs:
           - pr: 191
             sha: 17a5e9cf654447e6299872c383d056bcf9f1cdeb
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TEST_FLEET_READ_TOKEN: ${{ secrets.TEST_FLEET_READ_TOKEN }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
-      - name: Fetch exact ores-compose head
+      - name: Require private-source read credential
         shell: bash
         run: |
           set -euo pipefail
-          git clone --no-checkout https://github.com/ORESoftware/ores-compose.git /tmp/ores-compose
-          git -C /tmp/ores-compose fetch origin "${{ matrix.sha }}"
-          git -C /tmp/ores-compose checkout --detach "${{ matrix.sha }}"
-          test "$(git -C /tmp/ores-compose rev-parse HEAD)" = "${{ matrix.sha }}"
+          [[ -n "$TEST_FLEET_READ_TOKEN" ]] || {
+            echo 'TEST_FLEET_READ_TOKEN is required for exact private-source certification' >&2
+            exit 78
+          }
+      - name: Check out exact ores-compose head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ORESoftware/ores-compose
+          ref: ${{ matrix.sha }}
+          token: ${{ secrets.TEST_FLEET_READ_TOKEN }}
+          persist-credentials: false
+          path: source
+      - name: Verify immutable source head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C source rev-parse HEAD)" = "${{ matrix.sha }}"
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: 1.88.0
+          components: rustfmt, clippy
       - name: Format
-        working-directory: /tmp/ores-compose
+        working-directory: source
         run: cargo fmt --all --check
       - name: Clippy
-        working-directory: /tmp/ores-compose
+        working-directory: source
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: Test
-        working-directory: /tmp/ores-compose
+        working-directory: source
         run: cargo test --workspace --all-targets --all-features --locked
