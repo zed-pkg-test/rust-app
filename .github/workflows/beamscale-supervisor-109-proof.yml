@@ -1,0 +1,92 @@
+name: BeamScale supervisor #109 exact-head proof
+
+on:
+  pull_request:
+  push:
+    branches:
+      - proof/beamscale-supervisor-109-cowboy-20260926
+
+permissions:
+  contents: read
+
+jobs:
+  prove:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      TEST_FLEET_READ_TOKEN: ${{ secrets.TEST_FLEET_READ_TOKEN }}
+      SOURCE_SHA: a701fdada843424e00874e64ed209abd96442385
+    steps:
+      - name: Require private-source read credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "$TEST_FLEET_READ_TOKEN" ]] || {
+            echo 'TEST_FLEET_READ_TOKEN is required for exact private-source certification' >&2
+            exit 78
+          }
+      - name: Check out exact BeamScale supervisor head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: beamscale/bmscl-supervisor
+          ref: ${{ env.SOURCE_SHA }}
+          token: ${{ secrets.TEST_FLEET_READ_TOKEN }}
+          persist-credentials: false
+          path: source
+      - name: Verify immutable source head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C source rev-parse HEAD)" = "$SOURCE_SHA"
+      - name: Set up OTP, Rebar3, and Gleam
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          otp-version: '27.3'
+          rebar3-version: '3.24.0'
+          gleam-version: '1.18.0'
+      - name: Compile
+        working-directory: source
+        run: rebar3 compile
+      - name: EUnit
+        working-directory: source
+        run: rebar3 eunit
+      - name: Xref
+        working-directory: source
+        run: rebar3 xref
+      - name: Prove Hosted Gleam ABI fixture
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd test/fixtures/hosted_abi
+          gleam build
+          beam_dir="$(dirname "$(find build -type f -name worker.beam -print -quit)")"
+          test -n "$beam_dir"
+          erl -noshell -pa "$beam_dir" -eval '
+            Request = {request, <<"POST">>, <<"/abi">>,
+                       [{<<"content-type">>, <<"application/octet-stream">>}],
+                       <<0,1,2>>},
+            Context = {context,
+                       {cluster_capability, <<"cluster">>},
+                       {some, {http_capability, <<"http">>}},
+                       {log_capability, <<"log">>},
+                       none,
+                       123},
+            {response, 201, Headers, <<0,1,2>>} = worker:handle(Request, Context),
+            true = lists:member({<<"x-method">>, <<"POST">>}, Headers),
+            true = lists:member({<<"x-url">>, <<"/abi">>}, Headers),
+            true = lists:member({<<"x-capabilities">>, <<"http-only">>}, Headers),
+            true = lists:member({<<"x-deadline">>, <<"123">>}, Headers),
+            halt(0).'
+      - name: Build self-contained OTP release
+        working-directory: source
+        run: rebar3 release
+      - name: Smoke self-contained release files
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rel=_build/default/rel/bmscl_supervisor
+          test -x "$rel/bin/bmscl_supervisor"
+          test -f "$rel/releases/0.1.0/start.boot"
+          test -n "$(find "$rel" -path '*/erts-*/bin/beam.smp' -type f -print -quit)"
