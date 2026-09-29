@@ -1,0 +1,57 @@
+name: ores-compose current exact-head proof
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pr: 187
+            sha: 2d5fbe9c7ef42d7112afc46f75cc184f521332f1
+          - pr: 191
+            sha: 17a5e9cf654447e6299872c383d056bcf9f1cdeb
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TEST_FLEET_READ_TOKEN: ${{ secrets.TEST_FLEET_READ_TOKEN }}
+    steps:
+      - name: Require private-source read credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "$TEST_FLEET_READ_TOKEN" ]] || {
+            echo 'TEST_FLEET_READ_TOKEN is required for exact private-source certification' >&2
+            exit 78
+          }
+      - name: Check out exact ores-compose head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ORESoftware/ores-compose
+          ref: ${{ matrix.sha }}
+          token: ${{ secrets.TEST_FLEET_READ_TOKEN }}
+          persist-credentials: false
+          path: source
+      - name: Verify immutable source head
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C source rev-parse HEAD)" = "${{ matrix.sha }}"
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: 1.88.0
+          components: rustfmt, clippy
+      - name: Format
+        working-directory: source
+        run: cargo fmt --all --check
+      - name: Clippy
+        working-directory: source
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - name: Test
+        working-directory: source
+        run: cargo test --workspace --all-targets --all-features --locked
