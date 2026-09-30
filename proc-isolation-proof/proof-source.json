@@ -1,0 +1,33 @@
+{
+  "schema": "ores.exact-head-proof/v1",
+  "sourceRepository": "ORESoftware/ores-proc-isolation-cli",
+  "sourcePullRequest": 12,
+  "sourceCommit": "221449a9815808128d30fdb2e58d3e3f0e5ab392",
+  "files": {
+    ".cli-flags.toml": "b5732649df2be3ad9f27307e07c4c7cdbd5c10d7",
+    ".ores-proc-isolation.yaml": "d7268c5f291d9521533be2d36da46bdd7c03a128",
+    "Cargo.toml": "75c1a02145851476974e41a16195e81cdea9d89c",
+    "examples/beamscale-hosted-gleam.yaml": "ffb6365ed5d32d4fd775307f80de5c8b8f6c66fb",
+    "examples/loopback_fixture.rs": "e135deee9c1af0f694c97bc6b6d73bb73883ad1c",
+    "scripts/linux/ores-proc-isolate.sh": "0765fa1e474f65b2ad0c3a7f41d53f814f66a7ce",
+    "scripts/macos/ores-proc-isolate.sh": "1be2252f87dea8880cdc89a5ad9b5ccdcbfaab47",
+    "src/config.rs": "478eefddd3fd675033dc02fa27242564070ff17a",
+    "src/error.rs": "1686b8f363e3ae3215918259f7c57b0d32e8e98d",
+    "src/flags.rs": "6a629de02a58091951e7493912739bb097a10cfe",
+    "src/lib.rs": "1d1ac2e26821df663acea714304cb5a9cd88d2ad",
+    "src/main.rs": "87738a4f0d494dcca175d3248d6c3283cc797f81",
+    "src/platform/linux.rs": "9e0bff1e2c90353e8321fde4df9abe48aefb6b51",
+    "src/platform/macos.rs": "7bce031f2816a8771436257ef377ccbc6ae5ee87",
+    "src/platform/mod.rs": "767ec7e24722729cbbba3bb8f21d2528090668bd",
+    "src/runner.rs": "4b7148cf72a4d590be7572fe7efd97a452ac0e3d",
+    "tests/beamscale_honeypot_profile.rs": "949a0378db47f114b6521cd0b4e33d6277dbddce",
+    "tests/linux_helper_tripwire_contract.rs": "93ee15574982e68fdf9c2f2ae17b3d92b1db5f26",
+    "tests/linux_network_helper_liveness_contract.rs": "a59b7d5777e92e7d60a81762a19a7540aad2b4d6",
+    "tests/nixos_trusted_helper_contract.rs": "e7c15f68322ca27ff68cde5e72d1a4d17e19a305",
+    "tests/policy.rs": "76e84045e4fc7b6450d3e84fd335e0fc46616ff0",
+    "vendor/ores-reactive-maps/Cargo.toml": "bb037c526961038d62e40221c82c35a3f71c944f",
+    "vendor/ores-reactive-maps/LICENSE": "01521bb00184c8d5307d0287bc22cb1af46fe1f2",
+    "vendor/ores-reactive-maps/UPSTREAM.md": "d6ea50e40d20811bdf80020543bf80d5bd027185",
+    "vendor/ores-reactive-maps/src/lib.rs": "ee8910a4f8d5db0f226b1b130672f234975ab586"
+  }
+}

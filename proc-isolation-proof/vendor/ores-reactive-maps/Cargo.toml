@@ -1,0 +1,11 @@
+[package]
+name = "ores-reactive-maps"
+version = "0.1.0"
+edition = "2021"
+description = "Layered reactive key/value maps with deterministic precedence and source metadata"
+license = "MIT"
+repository = "https://github.com/ORESoftware/ores-reactive-maps"
+
+[lib]
+name = "ores_reactive_maps"
+path = "src/lib.rs"

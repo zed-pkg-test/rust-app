@@ -1,0 +1,36 @@
+version: 1
+
+defaults:
+  group: beamscale-hosted-gleam
+
+groups:
+  beamscale-hosted-gleam:
+    members:
+      - beamscale-worker
+    filesystem:
+      # Exact-path mounts only. Do not replace these with /opt or /run.
+      # The tripwire directory contains inert wrappers; the socket is the only
+      # host runtime endpoint exposed to this bare-process profile.
+      read_only:
+        - /opt/beamscale/honeypot-bin
+        - /run/bmscl-honeypot/tripwire.sock
+    network:
+      mode: external
+      deny_loopback: true
+      deny_private_networks: true
+    limits:
+      max_open_files: 128
+      cpu_seconds: 300
+    environment:
+      # Hosted Gleam has a no-child-process contract. If compromised code still
+      # attempts PATH lookup, it can resolve only inert honeypot wrappers.
+      PATH: /opt/beamscale/honeypot-bin
+
+processes:
+  beamscale-worker:
+    group: beamscale-hosted-gleam
+    # Production replaces this with the canonical admitted BEAM executable.
+    # It remains absolute so policy validation is deterministic.
+    command:
+      - /opt/beamscale/runtime/beam.smp
+    environment: {}
