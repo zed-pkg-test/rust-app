@@ -1,0 +1,16 @@
+{
+  "name": "@beamscale/interfaces-contract-checks",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "check:typespec": "tsp compile typespec/main.tsp",
+    "check:json": "node -e \"for (const f of ['schema/worker-manifest.schema.json','schema/module-contract.schema.json','schema/tenant-runtime.schema.json','schema/deployment-control.schema.json','schema/host-security-incident.schema.json','schema/host-security-incident-receipt.schema.json','schema/critical-section-deployment.schema.json','schema/critical-section-operations.schema.json']) JSON.parse(require('fs').readFileSync(f,'utf8'))\"",
+    "check:module-parity": "node --test tests/module-contract-parity.test.mjs",
+    "check:module-projections": "node --test tests/module-projections.test.mjs",
+    "check": "npm run check:typespec && npm run check:json && npm run check:module-parity && npm run check:module-projections"
+  },
+  "devDependencies": {
+    "@typespec/compiler": "1.16.0",
+    "@typespec/http": "1.16.0"
+  }
+}

@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beamscale.dev/schema/host-security-incident.schema.json",
+  "title": "BeamScale host security incident",
+  "description": "Host-derived runtime identity and breakout/quarantine incident contract. User, tenant, deployment and runtime identity are supplied by trusted host/control-plane state, never by tenant callback input.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "incident_id",
+    "detected_at",
+    "sensor",
+    "report",
+    "attribution",
+    "namespaces",
+    "stage",
+    "frozen"
+  ],
+  "properties": {
+    "incident_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "detected_at": {
+      "type": "string",
+      "format": "date-time",
+      "maxLength": 64
+    },
+    "sensor": {
+      "type": "string",
+      "enum": [
+        "command-wrapper",
+        "kernel-exec",
+        "canary-file",
+        "firecracker-guest"
+      ]
+    },
+    "report": {
+      "$ref": "#/$defs/report"
+    },
+    "attribution": {
+      "$ref": "#/$defs/attribution"
+    },
+    "namespaces": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mnt": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "pid": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "user": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "net": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "cgroup": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "ipc": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "uts": {
+          "type": "string",
+          "maxLength": 256
+        }
+      }
+    },
+    "frozen": {
+      "type": "boolean"
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "detected",
+        "contained"
+      ]
+    }
+  },
+  "$defs": {
+    "subject_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9._:@+-]+$"
+    },
+    "runtime_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runtime_id",
+        "user_id",
+        "tenant_id",
+        "deployment_id"
+      ],
+      "properties": {
+        "runtime_id": {
+          "$ref": "#/$defs/subject_id"
+        },
+        "user_id": {
+          "$ref": "#/$defs/subject_id"
+        },
+        "tenant_id": {
+          "$ref": "#/$defs/subject_id"
+        },
+        "deployment_id": {
+          "$ref": "#/$defs/subject_id"
+        },
+        "invocation_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/subject_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "peer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pid",
+        "uid",
+        "gid"
+      ],
+      "properties": {
+        "pid": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "uid": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "gid": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      }
+    },
+    "attribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "peer",
+        "cgroup_path",
+        "identity"
+      ],
+      "properties": {
+        "peer": {
+          "$ref": "#/$defs/peer"
+        },
+        "cgroup_path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^/sys/fs/cgroup/beamscale/.+$"
+        },
+        "identity": {
+          "$ref": "#/$defs/runtime_identity"
+        }
+      }
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "argc"
+      ],
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9._+\\-]+$"
+        },
+        "argc": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        }
+      }
+    }
+  }
+}

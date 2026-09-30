@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beamscale.dev/schema/critical-section-operations.schema.json",
+  "title": "BeamScale critical-section operations",
+  "$defs": {
+    "token": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runtime_epoch",
+        "owner_epoch",
+        "sequence"
+      ],
+      "properties": {
+        "runtime_epoch": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "owner_epoch": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "identity": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  },
+  "oneOf": [
+    {
+      "title": "acquire",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "holder",
+        "request_id",
+        "lease_ms"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/key"
+        },
+        "holder": {
+          "$ref": "#/$defs/identity"
+        },
+        "request_id": {
+          "$ref": "#/$defs/request_id"
+        },
+        "lease_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300000
+        }
+      }
+    },
+    {
+      "title": "renew",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "holder",
+        "lease_ms",
+        "token"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/key"
+        },
+        "holder": {
+          "$ref": "#/$defs/identity"
+        },
+        "lease_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300000
+        },
+        "token": {
+          "$ref": "#/$defs/token"
+        }
+      }
+    },
+    {
+      "title": "release",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "holder",
+        "token"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/key"
+        },
+        "holder": {
+          "$ref": "#/$defs/identity"
+        },
+        "token": {
+          "$ref": "#/$defs/token"
+        }
+      }
+    }
+  ]
+}

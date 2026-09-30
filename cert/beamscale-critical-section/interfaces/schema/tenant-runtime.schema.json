@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beamscale.dev/schema/tenant-runtime.schema.json",
+  "title": "BeamScale Tenant Runtime",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["identity", "policy", "state"],
+  "properties": {
+    "identity": { "$ref": "#/$defs/tenant_runtime_identity" },
+    "policy": { "$ref": "#/$defs/tenant_runtime_policy" },
+    "state": { "$ref": "#/$defs/tenant_runtime_state" },
+    "deployment_id": { "type": "string", "minLength": 1 },
+    "worker_version_id": { "type": "string", "minLength": 1 },
+    "worker_version_digest": { "$ref": "#/$defs/sha256" },
+    "host_id": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tenant_runtime_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenant_id", "shard_id", "runtime_epoch"],
+      "properties": {
+        "tenant_id": { "type": "string", "minLength": 1 },
+        "shard_id": { "type": "string", "minLength": 1 },
+        "runtime_epoch": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "tenant_isolation": {
+      "type": "string",
+      "enum": ["micro_vm", "linux_container"]
+    },
+    "microvm_backend": {
+      "type": "string",
+      "enum": ["firecracker", "cloud_hypervisor"]
+    },
+    "tenant_runtime_state": {
+      "type": "string",
+      "enum": [
+        "cold",
+        "starting",
+        "hot",
+        "warm_idle",
+        "hibernated",
+        "draining",
+        "terminated"
+      ]
+    },
+    "tenant_runtime_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_version",
+        "isolation",
+        "microvm_backend",
+        "vcpu_count",
+        "min_memory_bytes",
+        "max_memory_bytes",
+        "warm_idle_ms",
+        "hibernate_after_ms",
+        "destroy_after_ms",
+        "allow_snapshot_restore"
+      ],
+      "properties": {
+        "policy_version": { "const": "bmscl-tenant-runtime-v1" },
+        "isolation": { "$ref": "#/$defs/tenant_isolation" },
+        "microvm_backend": { "$ref": "#/$defs/microvm_backend" },
+        "vcpu_count": { "type": "integer", "minimum": 1 },
+        "min_memory_bytes": { "type": "integer", "minimum": 67108864 },
+        "max_memory_bytes": { "type": "integer", "minimum": 67108864 },
+        "warm_idle_ms": { "type": "integer", "minimum": 1 },
+        "hibernate_after_ms": { "type": "integer", "minimum": 1 },
+        "destroy_after_ms": { "type": "integer", "minimum": 1 },
+        "allow_snapshot_restore": { "type": "boolean" }
+      }
+    },
+    "metering_sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "request_count",
+        "cpu_ns",
+        "memory_byte_ms",
+        "ingress_bytes",
+        "egress_bytes",
+        "durable_storage_byte_ms"
+      ],
+      "properties": {
+        "identity": { "$ref": "#/$defs/tenant_runtime_identity" },
+        "request_count": { "type": "integer", "minimum": 0 },
+        "cpu_ns": { "type": "integer", "minimum": 0 },
+        "memory_byte_ms": { "type": "integer", "minimum": 0 },
+        "ingress_bytes": { "type": "integer", "minimum": 0 },
+        "egress_bytes": { "type": "integer", "minimum": 0 },
+        "durable_storage_byte_ms": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
