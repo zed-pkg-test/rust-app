@@ -1,0 +1,46 @@
+name: BeamScale artifact ABI exact-head certification
+
+on:
+  pull_request:
+    paths:
+      - "certification/beamscale-artifact-abi/**"
+      - ".github/workflows/beamscale-artifact-abi-cert.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  exact-head-artifact-abi:
+    runs-on: ubuntu-latest
+    env:
+      BMSCL_COMPILER_HEAD: "5672b7dccf37ccc06d1750a18582c351e54a38b7"
+      BMSCL_SUPERVISOR_HEAD: "eb32d88a3540150feba1d9f1dfd8e11a3a6b0704"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "29.1.1"
+      - name: Record exact source heads
+        run: |
+          printf 'bmscl-compiler=%s\n' "$BMSCL_COMPILER_HEAD"
+          printf 'bmscl-supervisor=%s\n' "$BMSCL_SUPERVISOR_HEAD"
+      - name: Compile compiler manifest model
+        working-directory: certification/beamscale-artifact-abi/compiler
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test --all-targets
+      - name: Prove compiler build wiring emits both ABI fields
+        working-directory: certification/beamscale-artifact-abi/compiler
+        run: |
+          grep -F 'module_contract_version: MODULE_CONTRACT_V1' build-source.rs
+          grep -F 'context_abi: CONTEXT_ABI_V1' build-source.rs
+      - name: Compile and run supervisor artifact ABI EUnit
+        working-directory: certification/beamscale-artifact-abi/supervisor
+        run: |
+          mkdir -p ebin
+          erlc -DTEST -o ebin bmscl_artifact.erl
+          erl -noshell -pa ebin -eval 'case eunit:test(bmscl_artifact, [verbose]) of ok -> halt(0); _ -> halt(1) end.'
