@@ -59,10 +59,9 @@ fn safe_destination(root: &Path, relative: &str) -> Result<PathBuf, Box<dyn std:
             .components()
             .any(|component| !matches!(component, std::path::Component::Normal(_)))
     {
-        return Err(std::io::Error::other(format!(
-            "unsafe generated artifact path: {relative}"
-        ))
-        .into());
+        return Err(
+            std::io::Error::other(format!("unsafe generated artifact path: {relative}")).into(),
+        );
     }
     Ok(root.join(path))
 }

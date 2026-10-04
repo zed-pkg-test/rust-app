@@ -301,8 +301,12 @@ fn map_rust_type(ty: &Type) -> Result<OrmType> {
         "String" => Some(ScalarType::String),
         "Uuid" => Some(ScalarType::Uuid),
         "Date" | "NaiveDate" => Some(ScalarType::Date),
-        "DateTime" | "DateTimeUtc" | "DateTimeWithTimeZone" | "NaiveDateTime"
-        | "OffsetDateTime" | "PrimitiveDateTime" => Some(ScalarType::DateTime),
+        "DateTime"
+        | "DateTimeUtc"
+        | "DateTimeWithTimeZone"
+        | "NaiveDateTime"
+        | "OffsetDateTime"
+        | "PrimitiveDateTime" => Some(ScalarType::DateTime),
         "Json" | "JsonValue" | "Value" => Some(ScalarType::Json),
         _ => None,
     };

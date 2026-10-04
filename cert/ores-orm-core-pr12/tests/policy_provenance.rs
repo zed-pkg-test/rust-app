@@ -36,14 +36,11 @@ fn evidence(ir: &OrmIr) -> GenerationEvidence {
 #[test]
 fn derivative_manifest_binds_the_exact_validated_policy_independently_of_options() {
     let ir = private_ir();
-    let policy_a = Policy::from_toml(
-        "version = 1\nrequire_diesel = true\nrequire_seaorm = true\n",
-    )
-    .expect("policy a");
-    let policy_b = Policy::from_toml(
-        "version = 1\nrequire_diesel = false\nrequire_seaorm = true\n",
-    )
-    .expect("policy b");
+    let policy_a = Policy::from_toml("version = 1\nrequire_diesel = true\nrequire_seaorm = true\n")
+        .expect("policy a");
+    let policy_b =
+        Policy::from_toml("version = 1\nrequire_diesel = false\nrequire_seaorm = true\n")
+            .expect("policy b");
 
     // This private row shape is intentionally identical under both policies.
     // Provenance still must distinguish which exact policy was supplied to the
@@ -61,8 +58,7 @@ fn derivative_manifest_binds_the_exact_validated_policy_independently_of_options
         bundle_b.manifest.evidence.generator_options_sha256
     );
     assert_ne!(
-        bundle_a.manifest.policy_sha256,
-        bundle_b.manifest.policy_sha256,
+        bundle_a.manifest.policy_sha256, bundle_b.manifest.policy_sha256,
         "policy provenance must not collapse merely because the derived shape is unchanged"
     );
     assert_eq!(

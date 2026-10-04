@@ -28,12 +28,18 @@ fn ambiguous_cross_runtime_scalars_require_admitted_mappings() {
         ScalarType::Bytes,
     ] {
         let candidate = shape(scalar.clone());
-        assert!(rust::emit(&candidate).is_err(), "Rust unexpectedly admitted {scalar:?}");
+        assert!(
+            rust::emit(&candidate).is_err(),
+            "Rust unexpectedly admitted {scalar:?}"
+        );
         assert!(
             typescript::emit(&candidate).is_err(),
             "TypeScript unexpectedly admitted {scalar:?}"
         );
-        assert!(dart::emit(&candidate).is_err(), "Dart unexpectedly admitted {scalar:?}");
+        assert!(
+            dart::emit(&candidate).is_err(),
+            "Dart unexpectedly admitted {scalar:?}"
+        );
         assert!(
             gleam::emit(&candidate).is_err(),
             "Gleam unexpectedly admitted {scalar:?}"

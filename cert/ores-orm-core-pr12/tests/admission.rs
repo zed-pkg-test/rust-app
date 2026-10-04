@@ -442,7 +442,7 @@ fn admitted_bundle_requires_exact_verified_output_and_receipt_bytes() {
         Some((&contract_ir, &altered_receipt)),
     )
     .expect("digest binding accepts exact supplied bytes");
-    assert!(bundle::emit_admitted(&shape, &mismatched_evidence, &admission).is_err());
+    assert!(bundle::emit_admitted(&ir, &policy, &shape, &mismatched_evidence, &admission).is_err());
 
     let evidence = GenerationEvidence::from_bytes(
         &ir,

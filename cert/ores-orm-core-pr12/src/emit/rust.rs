@@ -179,7 +179,8 @@ fn rust_type(ty: &OrmType) -> Result<String> {
             }
             ScalarType::Date => {
                 return Err(OrmError::Unsupported(
-                    "date requires an admitted semantic calendar-date mapping before Rust emission".to_owned(),
+                    "date requires an admitted semantic calendar-date mapping before Rust emission"
+                        .to_owned(),
                 ));
             }
             ScalarType::DateTime => {

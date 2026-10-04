@@ -168,8 +168,8 @@ fn artifact_paths_are_safe_for_quoted_database_identifiers() {
     let ir = private_ir("../odd/table\\name", &[("body", "body")]);
     let policy = empty_policy();
     let shape = derive_shape(&ir.tables[0], &policy, ShapeKind::Row).expect("row shape");
-    let bundle = bundle::emit(&ir, &policy, &shape, &synthetic_evidence(&ir))
-        .expect("bundle should emit");
+    let bundle =
+        bundle::emit(&ir, &policy, &shape, &synthetic_evidence(&ir)).expect("bundle should emit");
 
     for artifact in &bundle.artifacts {
         let mut parts = artifact.path.split('/');
@@ -234,8 +234,8 @@ fn bundle_rejects_shape_not_derived_from_bound_ir_and_policy() {
 fn bundle_rejects_evidence_from_different_ir() {
     let ir = converged();
     let policy = Policy::from_toml(POLICY).expect("policy");
-    let shape = derive_shape(ir.table("users").unwrap(), &policy, ShapeKind::PublicCreate)
-        .expect("shape");
+    let shape =
+        derive_shape(ir.table("users").unwrap(), &policy, ShapeKind::PublicCreate).expect("shape");
     let other = private_ir("other", &[("body", "body")]);
 
     let error = bundle::emit(&ir, &policy, &shape, &synthetic_evidence(&other))
@@ -284,8 +284,8 @@ fn private_derivatives_remain_publishable_inside_the_backend_boundary() {
     let ir = private_ir("private_note", &[("body", "body")]);
     let policy = empty_policy();
     let shape = derive_shape(&ir.tables[0], &policy, ShapeKind::Row).expect("row shape");
-    let bundle = bundle::emit(&ir, &policy, &shape, &synthetic_evidence(&ir))
-        .expect("private bundle");
+    let bundle =
+        bundle::emit(&ir, &policy, &shape, &synthetic_evidence(&ir)).expect("private bundle");
 
     assert_eq!(
         bundle.manifest.publication,
