@@ -1,8 +1,6 @@
-target/
-.vendor/
-.zed/
-.zpkg.lock
-tmp
-temp
-tmp/worktrees
-temp/worktrees
+/target/
+/generated/
+.ores/
+*.profraw
+tmp/
+temp/
