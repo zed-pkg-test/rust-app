@@ -1,0 +1,174 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  rust:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
+        with:
+          ref: ${{ env.EXPECTED_SHA }}
+          persist-credentials: false
+      - name: Verify exact revision
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: 1.88.0
+          components: rustfmt,clippy
+      - name: Formatting
+        run: cargo fmt --all -- --check
+      - name: Check
+        run: cargo check --all-targets
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Tests
+        run: cargo test --all-targets
+
+  generated-runtime-surfaces:
+    needs: rust
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
+        with:
+          ref: ${{ env.EXPECTED_SHA }}
+          persist-credentials: false
+      - name: Verify exact revision
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: 1.88.0
+      - name: Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22.16.0
+      - name: Dart
+        uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d
+        with:
+          sdk: 3.13.3
+      - name: Gleam and Erlang
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124
+        with:
+          otp-version: '29.1'
+          gleam-version: '1.18.1'
+          rebar3-version: '3'
+      - name: Emit exact runtime fixture
+        env:
+          ORES_ORM_RUNTIME_FIXTURE_DIR: ${{ runner.temp }}/ores-orm-generated
+        run: cargo run --quiet --example emit_runtime_fixture
+      - name: Compile generated Rust DTO
+        env:
+          GEN: ${{ runner.temp }}/ores-orm-generated
+          WORK: ${{ runner.temp }}/generated-rust
+        run: |
+          mkdir -p "$WORK/src"
+          cp "$GEN"/rust/*.rs "$WORK/src/lib.rs"
+          cat > "$WORK/Cargo.toml" <<'TOML'
+          [package]
+          name = "ores-orm-generated-runtime-witness"
+          version = "0.0.0"
+          edition = "2024"
+          publish = false
+
+          [dependencies]
+          serde = { version = "1.0.228", features = ["derive"] }
+          serde_json = "1.0.145"
+          TOML
+          cargo check --quiet --manifest-path "$WORK/Cargo.toml"
+      - name: Type-check generated TypeScript and Zod
+        env:
+          GEN: ${{ runner.temp }}/ores-orm-generated
+          WORK: ${{ runner.temp }}/generated-typescript
+        run: |
+          mkdir -p "$WORK"
+          cp "$GEN"/typescript/*.ts "$WORK/index.ts"
+          cat > "$WORK/package.json" <<'JSON'
+          {
+            "private": true,
+            "type": "module",
+            "dependencies": {
+              "zod": "4.6.5"
+            },
+            "devDependencies": {
+              "typescript": "7.0.2"
+            }
+          }
+          JSON
+          (
+            cd "$WORK"
+            npm install --ignore-scripts --no-audit --no-fund
+            ./node_modules/.bin/tsc --noEmit --strict --skipLibCheck false --target ES2022 --module NodeNext --moduleResolution NodeNext index.ts
+          )
+      - name: Analyze generated Dart validator
+        env:
+          GEN: ${{ runner.temp }}/ores-orm-generated
+          WORK: ${{ runner.temp }}/generated-dart
+        run: |
+          mkdir -p "$WORK/lib"
+          cp "$GEN"/dart/*.dart "$WORK/lib/orm_derived.dart"
+          cat > "$WORK/pubspec.yaml" <<'YAML'
+          name: ores_orm_generated_runtime_witness
+          version: 0.0.0
+          environment:
+            sdk: '>=3.13.0 <4.0.0'
+          YAML
+          (
+            cd "$WORK"
+            dart pub get
+            dart analyze --fatal-infos --fatal-warnings
+          )
+      - name: Compile generated Gleam decoder
+        env:
+          GEN: ${{ runner.temp }}/ores-orm-generated
+          WORK: ${{ runner.temp }}/generated-gleam
+        run: |
+          mkdir -p "$WORK/src"
+          cp "$GEN"/gleam/*.gleam "$WORK/src/orm_derived.gleam"
+          cat > "$WORK/gleam.toml" <<'TOML'
+          name = "ores_orm_generated_runtime_witness"
+          version = "0.0.0"
+          target = "erlang"
+
+          [dependencies]
+          gleam_stdlib = "1.0.5"
+          TOML
+          (
+            cd "$WORK"
+            gleam deps download
+            gleam check
+          )
+      - name: Parse generated Draft 2020-12 JSON Schema and manifest
+        env:
+          GEN: ${{ runner.temp }}/ores-orm-generated
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, readdirSync } from 'node:fs';
+          import { join } from 'node:path';
+          const root = process.env.GEN;
+          const schemaName = readdirSync(join(root, 'json-schema')).find((name) => name.endsWith('.json'));
+          if (!schemaName) throw new Error('missing JSON Schema artifact');
+          const schema = JSON.parse(readFileSync(join(root, 'json-schema', schemaName), 'utf8'));
+          const manifest = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8'));
+          if (schema.$schema !== 'https://json-schema.org/draft/2020-12/schema') throw new Error('wrong JSON Schema dialect');
+          if (manifest.publication !== 'blocked_pending_contract_admission') throw new Error('public derivative must remain blocked pending TJSV admission');
+          NODE
