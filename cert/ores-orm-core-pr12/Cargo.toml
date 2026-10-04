@@ -1,0 +1,36 @@
+[package]
+name = "ores-orm-core"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "ORM-first derivative schema and validator tooling for ORESoftware"
+license = "UNLICENSED"
+publish = false
+
+[lib]
+name = "ores_orm_core"
+path = "src/lib.rs"
+
+[dependencies]
+hex = "0.4"
+proc-macro2 = "1"
+quote = "1"
+schemars = { version = "1.2", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+syn = { version = "2", features = ["full", "extra-traits", "parsing"] }
+thiserror = "2"
+toml = "0.9"
+walkdir = "2"
+
+[dev-dependencies]
+pretty_assertions = "1"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+needless_return = "allow"
