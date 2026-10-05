@@ -149,7 +149,7 @@ fn emit_dart_field_parse(out: &mut String, field: &ShapeField) -> Result<()> {
     } else {
         check
     };
-    let converted = dart_convert(&field.ty, &raw)?;
+    let converted = dart_convert(&field.ty, &raw, !field.nullable)?;
     let converted = if field.nullable {
         format!("{raw} == null ? null : {converted}")
     } else {
@@ -245,7 +245,7 @@ fn dart_check(ty: &OrmType, value: &str) -> Result<String> {
             }
             ScalarType::Int64 => return Err(unsupported_scalar("int64")),
             ScalarType::Float32 => return Err(unsupported_scalar("float32")),
-            ScalarType::Float64 => format!("{value} is num && ({value} as num).isFinite"),
+            ScalarType::Float64 => format!("{value} is num && {value}.isFinite"),
             ScalarType::Decimal => return Err(unsupported_scalar("decimal")),
             ScalarType::String => format!("{value} is String"),
             ScalarType::Uuid => return Err(unsupported_scalar("uuid")),
@@ -268,16 +268,40 @@ fn dart_check(ty: &OrmType, value: &str) -> Result<String> {
     return Ok(check);
 }
 
-fn dart_convert(ty: &OrmType, value: &str) -> Result<String> {
+fn dart_convert(ty: &OrmType, value: &str, promoted: bool) -> Result<String> {
     let converted = match ty {
         OrmType::Scalar(scalar) => match scalar {
-            ScalarType::Boolean => format!("{value} as bool"),
-            ScalarType::Int16 | ScalarType::Int32 => format!("{value} as int"),
+            ScalarType::Boolean => {
+                if promoted {
+                    value.to_owned()
+                } else {
+                    format!("{value} as bool")
+                }
+            }
+            ScalarType::Int16 | ScalarType::Int32 => {
+                if promoted {
+                    value.to_owned()
+                } else {
+                    format!("{value} as int")
+                }
+            }
             ScalarType::Int64 => return Err(unsupported_scalar("int64")),
             ScalarType::Float32 => return Err(unsupported_scalar("float32")),
-            ScalarType::Float64 => format!("({value} as num).toDouble()"),
+            ScalarType::Float64 => {
+                if promoted {
+                    format!("{value}.toDouble()")
+                } else {
+                    format!("({value} as num).toDouble()")
+                }
+            }
             ScalarType::Decimal => return Err(unsupported_scalar("decimal")),
-            ScalarType::String => format!("{value} as String"),
+            ScalarType::String => {
+                if promoted {
+                    value.to_owned()
+                } else {
+                    format!("{value} as String")
+                }
+            }
             ScalarType::Uuid => return Err(unsupported_scalar("uuid")),
             ScalarType::Date => return Err(unsupported_scalar("date")),
             ScalarType::DateTime => return Err(unsupported_scalar("date-time")),
@@ -286,8 +310,13 @@ fn dart_convert(ty: &OrmType, value: &str) -> Result<String> {
         },
         OrmType::Array(inner) => {
             let inner_type = dart_type(inner)?;
-            let item = dart_convert(inner, "item")?;
-            format!("({value} as List).map((item) => {item}).cast<{inner_type}>().toList()")
+            let item = dart_convert(inner, "item", false)?;
+            let list = if promoted {
+                value.to_owned()
+            } else {
+                format!("({value} as List)")
+            };
+            format!("{list}.map((item) => {item}).cast<{inner_type}>().toList()")
         }
         OrmType::Named(name) => {
             return Err(OrmError::Unsupported(format!(
