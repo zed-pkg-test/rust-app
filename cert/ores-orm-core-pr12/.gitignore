@@ -1,0 +1,6 @@
+/target/
+/generated/
+.ores/
+*.profraw
+tmp/
+temp/

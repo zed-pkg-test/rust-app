@@ -1,0 +1,13 @@
+version = 1
+require_diesel = true
+require_seaorm = true
+
+[table.users]
+public_surface = true
+generated = ["id", "created_at", "updated_at"]
+defaulted = ["created_at", "updated_at"]
+immutable = ["id", "created_at"]
+secret = ["password_hash"]
+public_read = ["id", "email", "display_name", "created_at", "updated_at"]
+public_create = ["email", "display_name"]
+public_update = ["email", "display_name"]

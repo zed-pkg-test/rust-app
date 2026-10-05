@@ -1,67 +1,61 @@
-name: ORES ORM exact-tree funded certification
+name: ci
 
 on:
+  push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ores-orm-core-pr12-${{ github.event.pull_request.number || github.run_id }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  SOURCE_HEAD: a09fd6fa07c91a3ba65a44ab7da13a63d015450f
-  SOURCE_TREE: 59df9ec5ac372c041e1454124ef530d78a07a189
-  MIRROR_DIR: cert/ores-orm-core-pr12
+  EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   rust:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
-      - name: Checkout carrier merge candidate
+      - name: Checkout exact revision
         uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
         with:
+          ref: ${{ env.EXPECTED_SHA }}
           persist-credentials: false
-      - name: Verify exact source tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse "HEAD:$MIRROR_DIR")" = "$SOURCE_TREE"
-          printf 'source-head=%s\nsource-tree=%s\n' "$SOURCE_HEAD" "$SOURCE_TREE"
+      - name: Verify exact revision
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
           toolchain: 1.88.0
           components: rustfmt,clippy
       - name: Formatting
-        working-directory: cert/ores-orm-core-pr12
         run: cargo fmt --all -- --check
       - name: Check
-        working-directory: cert/ores-orm-core-pr12
         run: cargo check --all-targets
       - name: Clippy
-        working-directory: cert/ores-orm-core-pr12
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        # Cargo.toml declares clippy::all=deny and clippy::pedantic=warn.
+        # Do not promote the intentionally advisory pedantic tier to errors here.
+        run: cargo clippy --all-targets --all-features
       - name: Tests
-        working-directory: cert/ores-orm-core-pr12
         run: cargo test --all-targets
 
   generated-runtime-surfaces:
     needs: rust
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
-      - name: Checkout carrier merge candidate
+      - name: Checkout exact revision
         uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
         with:
+          ref: ${{ env.EXPECTED_SHA }}
           persist-credentials: false
-      - name: Verify exact source tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse "HEAD:$MIRROR_DIR")" = "$SOURCE_TREE"
+      - name: Verify exact revision
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
         with:
@@ -81,7 +75,6 @@ jobs:
           gleam-version: '1.18.1'
           rebar3-version: '3'
       - name: Emit exact runtime fixture
-        working-directory: cert/ores-orm-core-pr12
         env:
           ORES_ORM_RUNTIME_FIXTURE_DIR: ${{ runner.temp }}/ores-orm-generated
         run: cargo run --quiet --example emit_runtime_fixture
@@ -112,11 +105,22 @@ jobs:
           mkdir -p "$WORK"
           cp "$GEN"/typescript/*.ts "$WORK/index.ts"
           cat > "$WORK/package.json" <<'JSON'
-          {"private":true,"type":"module","dependencies":{"zod":"4.6.5"},"devDependencies":{"typescript":"7.0.2"}}
+          {
+            "private": true,
+            "type": "module",
+            "dependencies": {
+              "zod": "4.6.5"
+            },
+            "devDependencies": {
+              "typescript": "7.0.2"
+            }
+          }
           JSON
-          cd "$WORK"
-          npm install --ignore-scripts --no-audit --no-fund
-          ./node_modules/.bin/tsc --noEmit --strict --skipLibCheck false --target ES2022 --module NodeNext --moduleResolution NodeNext index.ts
+          (
+            cd "$WORK"
+            npm install --ignore-scripts --no-audit --no-fund
+            ./node_modules/.bin/tsc --noEmit --strict --skipLibCheck false --target ES2022 --module NodeNext --moduleResolution NodeNext index.ts
+          )
       - name: Analyze generated Dart validator
         env:
           GEN: ${{ runner.temp }}/ores-orm-generated
@@ -130,9 +134,11 @@ jobs:
           environment:
             sdk: '>=3.13.0 <4.0.0'
           YAML
-          cd "$WORK"
-          dart pub get
-          dart analyze --fatal-infos --fatal-warnings
+          (
+            cd "$WORK"
+            dart pub get
+            dart analyze --fatal-infos --fatal-warnings
+          )
       - name: Compile generated Gleam decoder
         env:
           GEN: ${{ runner.temp }}/ores-orm-generated
@@ -148,9 +154,11 @@ jobs:
           [dependencies]
           gleam_stdlib = "1.0.5"
           TOML
-          cd "$WORK"
-          gleam deps download
-          gleam check
+          (
+            cd "$WORK"
+            gleam deps download
+            gleam check
+          )
       - name: Parse generated Draft 2020-12 JSON Schema and manifest
         env:
           GEN: ${{ runner.temp }}/ores-orm-generated
