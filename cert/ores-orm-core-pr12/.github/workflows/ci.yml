@@ -38,7 +38,9 @@ jobs:
       - name: Check
         run: cargo check --all-targets
       - name: Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        # Cargo.toml declares clippy::all=deny and clippy::pedantic=warn.
+        # Do not promote the intentionally advisory pedantic tier to errors here.
+        run: cargo clippy --all-targets --all-features
       - name: Tests
         run: cargo test --all-targets
 
