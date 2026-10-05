@@ -114,6 +114,7 @@ fn language_emitters_preserve_optional_nullable_and_closed_object_semantics() {
     assert!(dart.contains("final OresOptional<String?> display_nameValue"));
     assert!(dart.contains("unknownKeys"));
     assert!(dart.contains("missing required field: email"));
+    assert!(!dart.contains("emailRaw as String"));
     assert!(!dart.contains("password_hash"));
 
     let gleam = gleam::emit(&shape).expect("Gleam should emit");
@@ -247,7 +248,7 @@ fn patch_emitters_reject_empty_objects() {
 }
 
 #[test]
-fn dart_uuid_validation_accepts_all_hex_version_nibbles() {
+fn dart_uuid_emission_fails_closed_without_admitted_wire_mapping() {
     let shape = Shape {
         table: "example".to_owned(),
         kind: ShapeKind::PublicRead,
@@ -260,9 +261,10 @@ fn dart_uuid_validation_accepts_all_hex_version_nibbles() {
         }],
     };
 
-    let source = dart::emit(&shape).expect("Dart should emit");
-    assert!(source.contains("[0-9a-fA-F]{4}-[0-9a-fA-F]{4}"));
-    assert!(!source.contains("[1-5][0-9a-fA-F]{3}"));
+    let error = dart::emit(&shape)
+        .expect_err("UUID must remain blocked until a cross-runtime wire mapping is admitted");
+    assert!(error.to_string().contains("uuid"));
+    assert!(error.to_string().contains("admitted"));
 }
 
 #[test]
